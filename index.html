@@ -312,6 +312,112 @@
   }
   .top-toggle:hover { background: #7A6B5D; }
 
+  .deals-bar {
+    margin-bottom: 20px;
+    display: flex;
+  }
+  .deals-toggle {
+    background: #8B3A1F;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.2;
+    height: 44px;
+    transition: background 0.2s;
+  }
+  .deals-toggle:hover { background: #6B2C18; }
+
+  .deals-panel {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+  }
+  .deals-panel h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .deals-panel .deals-hint {
+    font-size: 13px;
+    color: #7A6B5D;
+    margin: 0 0 16px 0;
+  }
+  .deals-bulk {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #E5DCC8;
+  }
+  .deals-bulk button {
+    background: #5C5D2A;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .deals-bulk button:hover { background: #464727; }
+  .deals-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+  }
+  .deal-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    background: #FDF6E3;
+    border-radius: 8px;
+    border: 1px solid #E5DCC8;
+  }
+  .deal-row .brand-name {
+    font-weight: 600;
+    color: #3D2F1F;
+    font-size: 15px;
+  }
+  .deal-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .deal-row a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-decoration: none;
+    padding: 8px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .deal-row a.mp { background: #D88B6C; color: white; }
+  .deal-row a.mp:hover { background: #B86F50; }
+  .deal-row a.vt { background: #5C8A2E; color: white; }
+  .deal-row a.vt:hover { background: #4A7024; }
+  .deal-row a.tdh { background: #BF8A2E; color: white; }
+  .deal-row a.tdh:hover { background: #9C6F22; }
+
   .top-panel {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -528,7 +634,8 @@
     .filter-row { grid-template-columns: 1fr; gap: 10px; }
 
     .top-bar { flex-direction: column; align-items: stretch; }
-    .top-toggle, .export-btn {
+    .deals-bar { display: block; }
+    .top-toggle, .deals-toggle, .export-btn {
       justify-content: center;
       width: 100%;
       font-size: 14px;
@@ -538,6 +645,13 @@
 
     .top-panel { grid-template-columns: 1fr; gap: 12px; }
     .top-card { padding: 16px 18px; }
+
+    .deals-panel { padding: 16px 18px; }
+    .deals-list { grid-template-columns: 1fr; }
+    .deal-row { padding: 12px 14px; }
+    .deal-row .brand-name { font-size: 15px; }
+    .deal-row a { padding: 10px 6px; font-size: 13px; }
+    .deals-bulk button { width: 100%; }
 
     .exclusions-panel, .bundles-panel { padding: 14px 16px; }
     .exclusions-panel h3, .bundles-panel h3 {
@@ -716,6 +830,21 @@
   <div id="errorMsg" class="error hidden"></div>
   <pre id="debugLog" style="background:#2d2d2d;color:#c5e478;font-family:monospace;font-size:12px;padding:10px;border-radius:6px;max-height:180px;overflow:auto;margin-bottom:16px;white-space:pre-wrap;word-break:break-all;display:none;"></pre>
   <button type="button" id="debugToggle" style="background:transparent;border:1px solid #C9BFA8;color:#7A6B5D;padding:6px 12px;border-radius:6px;font-size:12px;margin-bottom:16px;cursor:pointer;">🔍 Debug log tonen</button>
+
+  <div class="deals-bar">
+    <button class="deals-toggle" id="dealsToggle">🔍 Deals zoeken tonen</button>
+  </div>
+
+  <div class="deals-panel hidden" id="dealsPanel">
+    <h3>🔍 Deals zoeken</h3>
+    <p class="deals-hint">Eén tik opent de zoekresultaten in een nieuw tabblad. "Open alles" opent alle merken tegelijk — sta pop-ups toe als je browser ernaar vraagt.</p>
+    <div class="deals-bulk">
+      <button id="dealsOpenAllMp">📦 Open alles op Marktplaats</button>
+      <button id="dealsOpenAllTdh">🇧🇪 Open alles op 2dehands</button>
+      <button id="dealsOpenAllVt">👕 Open alles op Vinted</button>
+    </div>
+    <div class="deals-list" id="dealsList"></div>
+  </div>
 
   <div id="dashboard" class="hidden">
 
@@ -1636,6 +1765,51 @@
     const hidden = panel.classList.toggle('hidden');
     btn.textContent = hidden ? '🏆 Top 5 lijsten tonen' : '🏆 Top 5 lijsten verbergen';
     if (!hidden) renderTopLists();
+  });
+
+  // Deals zoeken
+  const DEALS_BRANDS = [
+    'Karakuri', 'Naef', 'Revomaze', 'Felix Ure', 'Benno de Grote',
+    'Bill Cutler', 'Dee Dixon', 'Frans de Vreugd', 'Juno', 'Jesse Born',
+    'MWpuzzles', 'Pentangle', 'Perry McDaniel', 'Bill Sheckels'
+  ];
+  function mpUrl(brand) {
+    return 'https://www.marktplaats.nl/q/' + encodeURIComponent(brand.toLowerCase().replace(/\s+/g, '-')) + '/';
+  }
+  function tdhUrl(brand) {
+    return 'https://www.2dehands.be/q/' + encodeURIComponent(brand.toLowerCase().replace(/\s+/g, '-')) + '/';
+  }
+  function vtUrl(brand) {
+    return 'https://www.vinted.nl/catalog?search_text=' + encodeURIComponent(brand) + '&order=newest_first';
+  }
+  function renderDealsList() {
+    const list = document.getElementById('dealsList');
+    list.innerHTML = DEALS_BRANDS.map(b => `
+      <div class="deal-row">
+        <span class="brand-name">${escapeHtml(b)}</span>
+        <div class="deal-buttons">
+          <a class="mp" href="${mpUrl(b)}" target="_blank" rel="noopener noreferrer">📦 Marktplaats</a>
+          <a class="tdh" href="${tdhUrl(b)}" target="_blank" rel="noopener noreferrer">🇧🇪 2dehands</a>
+          <a class="vt" href="${vtUrl(b)}" target="_blank" rel="noopener noreferrer">👕 Vinted</a>
+        </div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('dealsToggle').addEventListener('click', () => {
+    const panel = document.getElementById('dealsPanel');
+    const btn = document.getElementById('dealsToggle');
+    const hidden = panel.classList.toggle('hidden');
+    btn.textContent = hidden ? '🔍 Deals zoeken tonen' : '🔍 Deals zoeken verbergen';
+    if (!hidden) renderDealsList();
+  });
+  document.getElementById('dealsOpenAllMp').addEventListener('click', () => {
+    DEALS_BRANDS.forEach(b => window.open(mpUrl(b), '_blank', 'noopener,noreferrer'));
+  });
+  document.getElementById('dealsOpenAllTdh').addEventListener('click', () => {
+    DEALS_BRANDS.forEach(b => window.open(tdhUrl(b), '_blank', 'noopener,noreferrer'));
+  });
+  document.getElementById('dealsOpenAllVt').addEventListener('click', () => {
+    DEALS_BRANDS.forEach(b => window.open(vtUrl(b), '_blank', 'noopener,noreferrer'));
   });
 
   // Edit modal + export
