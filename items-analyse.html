@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Items Analyse Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #F3EDE0;
+    color: #3D2F1F;
+  }
+  header {
+    background: linear-gradient(135deg, #5C5D2A 0%, #8B3A1F 100%);
+    color: white;
+    padding: 30px 40px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 28px; }
+  header p { margin: 8px 0 0 0; opacity: 0.9; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 30px 40px; }
+
+  .upload-zone {
+    background: white;
+    border: 2px dashed #C9BFA8;
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    margin-bottom: 30px;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: #5C5D2A;
+    background: #F5F0DC;
+  }
+  .upload-zone { display: block; }
+  .upload-zone input { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+  .upload-zone .upload-btn {
+    display: inline-block;
+    background: #5C5D2A;
+    color: white;
+    padding: 12px 28px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .upload-zone:hover .upload-btn { background: #464727; }
+  .upload-zone p { margin: 15px 0 0 0; color: #7A6B5D; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .stat-card h3 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #7A6B5D;
+    letter-spacing: 0.5px;
+  }
+  .stat-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .stat-card .sub { font-size: 13px; color: #7A6B5D; margin-top: 6px; }
+  .positive { color: #5C8A2E; }
+  .negative { color: #8B3A1F; }
+  .neutral { color: #5C5D2A; }
+
+  .filters {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .filters h2 { margin: 0 0 16px 0; font-size: 18px; }
+  .filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .filter-row input, .filter-row select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #D9CFB9;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+  }
+  .filter-row input:focus, .filter-row select:focus {
+    outline: none;
+    border-color: #5C5D2A;
+  }
+
+  .table-wrapper {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .table-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #E5DCC8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .table-header h2 { margin: 0; font-size: 18px; }
+  .table-header .count { color: #7A6B5D; font-size: 14px; }
+  .table-scroll { overflow-x: auto; max-height: 600px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E5DCC8; }
+  th {
+    background: #F0E8D6;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #7A6B5D;
+    letter-spacing: 0.3px;
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { background: #F5F0DC; }
+  th .sort-indicator { margin-left: 6px; opacity: 0.5; }
+  tr:hover { background: #F9F4E8; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-yes { background: #E5EDD4; color: #5C8A2E; }
+  .badge-no { background: #F5DDCF; color: #8B3A1F; }
+
+  tr.excluded { opacity: 0.4; background: #EAE0CC; }
+  tr.excluded td { text-decoration: line-through; }
+  tr.excluded td:first-child, tr.excluded td:last-child { text-decoration: none; }
+
+  .exclude-btn {
+    background: #F5DDCF;
+    color: #8B3A1F;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .exclude-btn:hover { background: #8B3A1F; color: white; }
+  .exclude-btn.active { background: #5C8A2E; color: white; }
+  .exclude-btn.active:hover { background: #4A7024; }
+
+  .exclusions-panel {
+    background: #FBF1E1;
+    border: 1px solid #DDA890;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+  .exclusions-panel h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #8B3A1F;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .exclusions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .exclusion-chip {
+    background: white;
+    border: 1px solid #DDA890;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .exclusion-chip button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #8B3A1F;
+    font-weight: bold;
+    padding: 0 2px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .clear-all {
+    background: none;
+    border: 1px solid #8B3A1F;
+    color: #8B3A1F;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .clear-all:hover { background: #8B3A1F; color: white; }
+
+  .stat-card .sub.excluded-note {
+    color: #D88B6C;
+    font-weight: 500;
+  }
+
+  tr.bundle-header { background: #E8EDD6; }
+  tr.bundle-header td { font-weight: 600; }
+  tr.bundle-item td:first-child { padding-left: 32px; position: relative; }
+  tr.bundle-item td:first-child::before {
+    content: '↳';
+    position: absolute;
+    left: 16px;
+    color: #5C5D2A;
+    font-weight: bold;
+  }
+  .bundle-note {
+    display: inline-block;
+    background: #5C5D2A;
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    margin-left: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .distributed-price {
+    color: #5C5D2A;
+    font-style: italic;
+  }
+  .original-price {
+    text-decoration: line-through;
+    opacity: 0.5;
+    font-size: 11px;
+    margin-right: 4px;
+  }
+
+  .bundle-btn {
+    background: #E8EDD6;
+    color: #5C5D2A;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    margin-left: 4px;
+    transition: all 0.15s;
+  }
+  .bundle-btn:hover { background: #5C5D2A; color: white; }
+  .bundle-btn.active { background: #5C5D2A; color: white; }
+  .bundle-btn.active:hover { background: #464727; }
+
+  .bundles-panel {
+    background: #E8EDD6;
+    border: 1px solid #A5AE94;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+  .bundles-panel h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #464727;
+  }
+  .bundles-panel .hint {
+    font-size: 12px;
+    color: #5C5D2A;
+    margin-top: 8px;
+  }
+  .action-cell { white-space: nowrap; }
+
+  .top-toggle {
+    background: #3D2F1F;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.2;
+    height: 44px;
+    transition: background 0.2s;
+  }
+  .top-toggle:hover { background: #7A6B5D; }
+
+  .deals-bar {
+    margin-bottom: 20px;
+    display: flex;
+  }
+  .deals-toggle {
+    background: #8B3A1F;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.2;
+    height: 44px;
+    transition: background 0.2s;
+  }
+  .deals-toggle:hover { background: #6B2C18; }
+
+  .deals-panel {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+  }
+  .deals-panel h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .deals-panel .deals-hint {
+    font-size: 13px;
+    color: #7A6B5D;
+    margin: 0 0 16px 0;
+  }
+  .deals-bulk {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #E5DCC8;
+  }
+  .deals-bulk button {
+    background: #5C5D2A;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .deals-bulk button:hover { background: #464727; }
+  .deals-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+  }
+  .deal-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    background: #FDF6E3;
+    border-radius: 8px;
+    border: 1px solid #E5DCC8;
+  }
+  .deal-row .brand-name {
+    font-weight: 600;
+    color: #3D2F1F;
+    font-size: 15px;
+  }
+  .deal-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .deal-row a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-decoration: none;
+    padding: 8px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .deal-row a.mp { background: #D88B6C; color: white; }
+  .deal-row a.mp:hover { background: #B86F50; }
+  .deal-row a.vt { background: #5C8A2E; color: white; }
+  .deal-row a.vt:hover { background: #4A7024; }
+  .deal-row a.tdh { background: #BF8A2E; color: white; }
+  .deal-row a.tdh:hover { background: #9C6F22; }
+
+  .top-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  .top-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .top-card h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .top-list li {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #E5DCC8;
+  }
+  .top-list li:last-child { border-bottom: none; }
+  .top-rank {
+    background: #F5F0DC;
+    color: #5C5D2A;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .top-rank.gold { background: #F5E2C3; color: #B87F2B; }
+  .top-rank.silver { background: #E8EDD6; color: #8C9479; }
+  .top-rank.bronze { background: #F5D5C0; color: #8B3A1F; }
+  .top-item-name { font-weight: 600; font-size: 14px; }
+  .top-item-sub { font-size: 12px; color: #7A6B5D; margin-top: 2px; }
+  .top-item-value {
+    font-weight: 700;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .top-empty {
+    padding: 20px;
+    text-align: center;
+    color: #C9BFA8;
+    font-size: 13px;
+  }
+
+  /* Edit button + CSV export */
+  .edit-btn {
+    background: #F5DDCF;
+    color: #D88B6C;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    margin-left: 4px;
+    transition: all 0.15s;
+  }
+  .edit-btn:hover { background: #D88B6C; color: white; }
+
+  .top-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .export-btn {
+    background: #5C8A2E;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.2;
+    height: 44px;
+    transition: background 0.2s;
+  }
+  .export-btn:hover { background: #4A7024; }
+  .export-btn:disabled { background: #C9BFA8; cursor: not-allowed; }
+  .unsaved-badge {
+    background: #D88B6C;
+    color: white;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 12px;
+    padding: 28px;
+    width: 500px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+  .modal h2 {
+    margin: 0 0 20px 0;
+    font-size: 20px;
+  }
+  .form-group {
+    margin-bottom: 14px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7A6B5D;
+    margin-bottom: 4px;
+  }
+  .form-group input, .form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #D9CFB9;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: #5C5D2A;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #E5DCC8;
+  }
+  .btn-save {
+    background: #5C5D2A;
+    color: white;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-save:hover { background: #464727; }
+  .btn-cancel {
+    background: #E5DCC8;
+    color: #3D2F1F;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-cancel:hover { background: #D9CFB9; }
+
+  /* ===== Mobile (≤ 640px) ===== */
+  @media (max-width: 640px) {
+    header {
+      padding: 20px 16px;
+    }
+    header h1 { font-size: 22px; }
+    header p { font-size: 13px; }
+
+    .container { padding: 16px; }
+
+    .upload-zone {
+      padding: 24px 16px;
+    }
+    .upload-zone label {
+      padding: 12px 20px;
+      font-size: 14px;
+    }
+
+    .stats-grid { gap: 12px; margin-bottom: 20px; }
+    .stat-card { padding: 16px 18px; }
+    .stat-card .value { font-size: 22px; }
+    .stat-card h3 { font-size: 11px; }
+
+    .filters { padding: 16px; }
+    .filters h2 { font-size: 15px; }
+    .filter-row { grid-template-columns: 1fr; gap: 10px; }
+
+    .top-bar { flex-direction: column; align-items: stretch; }
+    .deals-bar { display: block; }
+    .top-toggle, .deals-toggle, .export-btn {
+      justify-content: center;
+      width: 100%;
+      font-size: 14px;
+      padding: 12px 16px;
+    }
+    .unsaved-badge { text-align: center; }
+
+    .top-panel { grid-template-columns: 1fr; gap: 12px; }
+    .top-card { padding: 16px 18px; }
+
+    .deals-panel { padding: 16px 18px; }
+    .deals-list { grid-template-columns: 1fr; }
+    .deal-row { padding: 12px 14px; }
+    .deal-row .brand-name { font-size: 15px; }
+    .deal-row a { padding: 10px 6px; font-size: 13px; }
+    .deals-bulk button { width: 100%; }
+
+    .exclusions-panel, .bundles-panel { padding: 14px 16px; }
+    .exclusions-panel h3, .bundles-panel h3 {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    /* Transform table into card view */
+    .table-wrapper { border-radius: 10px; }
+    .table-header { padding: 14px 16px; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .table-header h2 { font-size: 16px; }
+    .table-scroll { overflow: visible; max-height: none; padding: 8px; }
+
+    table, thead, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; } /* hide header, use data-label instead */
+
+    tbody tr {
+      background: white;
+      border: 1px solid #E5DCC8;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    tbody tr:hover { background: white; } /* no hover bg on mobile */
+    tr.bundle-header {
+      background: #E8EDD6;
+      border-color: #A5AE94;
+    }
+    tr.bundle-item {
+      margin-left: 16px;
+    }
+
+    tbody td {
+      border-bottom: 1px solid #F0E8D6;
+      padding: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      text-align: right;
+    }
+    tbody td:last-child { border-bottom: none; }
+
+    /* Add the column label via ::before */
+    tbody td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #7A6B5D;
+      letter-spacing: 0.3px;
+      text-align: left;
+      flex-shrink: 0;
+    }
+
+    /* Naam row: bigger, no label visible, full width */
+    tbody td[data-label="Naam"] {
+      font-size: 16px;
+      font-weight: 700;
+      padding-top: 2px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #E5DCC8;
+    }
+    tbody td[data-label="Naam"]::before { display: none; }
+    tbody td[data-label="Naam"] { justify-content: flex-start; text-align: left; }
+
+    tr.bundle-item td[data-label="Naam"] { padding-left: 0; }
+    tr.bundle-item td[data-label="Naam"]::before {
+      content: none;
+    }
+
+    /* Merk row: muted subtitle under name */
+    tbody td[data-label="Merk"] {
+      font-size: 13px;
+      color: #7A6B5D;
+      padding-top: 0;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #E5DCC8;
+      justify-content: flex-start;
+    }
+    tbody td[data-label="Merk"]::before {
+      font-size: 12px;
+      margin-right: 6px;
+    }
+
+    /* Actions row: stack buttons full width */
+    tbody td.action-cell {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding-top: 12px;
+      white-space: normal;
+    }
+    tbody td.action-cell::before {
+      margin-bottom: 4px;
+    }
+    tbody td.action-cell button {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 14px;
+      margin-left: 0 !important;
+      min-height: 40px;
+    }
+
+    /* Price cell on mobile: distributed price below original */
+    tbody td .distributed-price { display: inline; }
+    tbody td .original-price { margin-right: 6px; }
+    tbody td[data-label="Prijs"] > div {
+      text-align: right;
+      font-size: 11px;
+    }
+
+    /* Bundle item inset */
+    tr.bundle-item td[data-label="Naam"]::first-letter {
+      /* keep original content */
+    }
+
+    /* Modal: full-height friendly */
+    .modal {
+      padding: 20px;
+      border-radius: 12px;
+    }
+    .modal h2 { font-size: 18px; }
+    .form-group input, .form-group select {
+      font-size: 16px; /* prevents iOS zoom on focus */
+      padding: 12px 14px;
+    }
+    .modal-actions { flex-direction: column-reverse; gap: 8px; }
+    .modal-actions button { width: 100%; padding: 12px; font-size: 15px; }
+
+    /* Badges slightly bigger on mobile for readability */
+    .badge { padding: 6px 12px; font-size: 13px; }
+    .bundle-note { font-size: 11px; }
+  }
+
+  /* Extra-small screens (≤ 380px) */
+  @media (max-width: 380px) {
+    header h1 { font-size: 20px; }
+    .stat-card .value { font-size: 20px; }
+    .container { padding: 12px; }
+  }
+
+  .hidden { display: none !important; }
+  .empty-state {
+    padding: 60px;
+    text-align: center;
+    color: #7A6B5D;
+  }
+  .error {
+    background: #F5DDCF;
+    color: #8B3A1F;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Items Analyse Dashboard</h1>
+  <p>Upload je CSV bestand en krijg direct inzicht in je aankopen, verkopen en winst</p>
+</header>
+
+<div class="container">
+
+  <label class="upload-zone" id="uploadZone" for="fileInput">
+    <span class="upload-btn">📁 Kies CSV bestand</span>
+    <input type="file" id="fileInput" accept=".csv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel">
+    <p>...of sleep je CSV bestand hierheen</p>
+    <p style="font-size: 12px; margin-top: 8px;">Verwachte kolommen: Naam, Merk, Prijs, Waarde, Verkocht, staat, originele doos</p>
+  </label>
+
+  <div id="errorMsg" class="error hidden"></div>
+  <pre id="debugLog" style="background:#2d2d2d;color:#c5e478;font-family:monospace;font-size:12px;padding:10px;border-radius:6px;max-height:180px;overflow:auto;margin-bottom:16px;white-space:pre-wrap;word-break:break-all;display:none;"></pre>
+  <button type="button" id="debugToggle" style="background:transparent;border:1px solid #C9BFA8;color:#7A6B5D;padding:6px 12px;border-radius:6px;font-size:12px;margin-bottom:16px;cursor:pointer;">🔍 Debug log tonen</button>
+
+  <div class="deals-bar">
+    <button class="deals-toggle" id="dealsToggle">🔍 Deals zoeken tonen</button>
+  </div>
+
+  <div class="deals-panel hidden" id="dealsPanel">
+    <h3>🔍 Deals zoeken</h3>
+    <p class="deals-hint">Eén tik opent de zoekresultaten in een nieuw tabblad. "Open alles" opent alle merken tegelijk — sta pop-ups toe als je browser ernaar vraagt.</p>
+    <div class="deals-bulk">
+      <button id="dealsOpenAllMp">📦 Open alles op Marktplaats</button>
+      <button id="dealsOpenAllTdh">🇧🇪 Open alles op 2dehands</button>
+      <button id="dealsOpenAllVt">👕 Open alles op Vinted</button>
+    </div>
+    <div class="deals-list" id="dealsList"></div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>💰 Totale uitgaven</h3>
+        <p class="value neutral" id="statTotalSpent">€0,00</p>
+        <p class="sub" id="statTotalItems">0 items gekocht</p>
+      </div>
+      <div class="stat-card">
+        <h3>📈 Totale winst/verlies</h3>
+        <p class="value" id="statProfit">€0,00</p>
+        <p class="sub" id="statProfitDetail">Op verkochte items</p>
+      </div>
+      <div class="stat-card">
+        <h3>💵 Totale verkoopwaarde</h3>
+        <p class="value neutral" id="statTotalSold">€0,00</p>
+        <p class="sub" id="statSoldCount">0 items verkocht</p>
+      </div>
+      <div class="stat-card">
+        <h3>📦 Huidige portefeuille</h3>
+        <p class="value neutral" id="statPortfolio">€0,00</p>
+        <p class="sub" id="statPortfolioCount">0 items in bezit</p>
+      </div>
+    </div>
+
+    <div class="top-bar">
+      <button class="top-toggle" id="topToggle">🏆 Top 5 lijsten tonen</button>
+      <button class="export-btn" id="exportBtn">💾 Download aangepaste CSV</button>
+      <span class="unsaved-badge hidden" id="unsavedBadge">Niet-opgeslagen wijzigingen</span>
+    </div>
+
+    <div class="top-panel hidden" id="topPanel">
+      <div class="top-card">
+        <h3>💰 Duurste in aanschaf</h3>
+        <ol class="top-list" id="topExpensive"></ol>
+      </div>
+      <div class="top-card">
+        <h3>📈 Meeste winst</h3>
+        <ol class="top-list" id="topProfit"></ol>
+      </div>
+      <div class="top-card">
+        <h3>🚀 Vaakst over de kop</h3>
+        <ol class="top-list" id="topRatio"></ol>
+      </div>
+    </div>
+
+    <div class="filters">
+      <h2>🔍 Filters</h2>
+      <div class="filter-row">
+        <input type="text" id="searchInput" placeholder="Zoek op naam...">
+        <select id="brandFilter"><option value="">Alle merken</option></select>
+        <select id="soldFilter">
+          <option value="">Verkoopstatus: Alles</option>
+          <option value="yes">Verkocht</option>
+          <option value="no">Niet verkocht</option>
+        </select>
+        <select id="conditionFilter"><option value="">Alle staten</option></select>
+        <select id="boxFilter">
+          <option value="">Originele doos: alles</option>
+          <option value="yes">Met doos</option>
+          <option value="no">Zonder doos</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="exclusionsPanel" class="exclusions-panel hidden">
+      <h3>
+        <span>🚫 Uitgesloten items (<span id="exclusionCount">0</span>) — niet meegerekend in statistieken</span>
+        <button class="clear-all" id="clearExclusions">Alles terughalen</button>
+      </h3>
+      <div class="exclusions-list" id="exclusionsList"></div>
+    </div>
+
+    <div id="bundlesPanel" class="bundles-panel hidden">
+      <h3>📦 Bundels — prijs wordt verdeeld over onderliggende items</h3>
+      <div id="bundlesList"></div>
+      <p class="hint">Een bundel-entry (zoals "Marktplaats puzzles2") heeft de totale inkoopprijs. Die prijs wordt verdeeld over de items eronder <strong>naar rato van hun Waarde</strong>: een puzzel met een hoge Waarde krijgt een groter deel van de inkoopprijs dan een puzzel met een lage Waarde. De bundel-rij zelf telt niet mee in de statistieken. Als alle Waardes 0 zijn wordt de prijs gelijkelijk verdeeld.</p>
+    </div>
+
+    <div class="table-wrapper">
+      <div class="table-header">
+        <h2>Items</h2>
+        <span class="count" id="itemCount">0 items</span>
+      </div>
+      <div class="table-scroll">
+        <table id="itemsTable">
+          <thead>
+            <tr id="tableHead"></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>✏️ Item bewerken</h2>
+    <div class="form-group">
+      <label for="editNaam">Naam</label>
+      <input type="text" id="editNaam">
+    </div>
+    <div class="form-group">
+      <label for="editMerk">Merk</label>
+      <input type="text" id="editMerk">
+    </div>
+    <div class="form-group">
+      <label for="editPrijs">Prijs (inkoop, in €)</label>
+      <input type="text" id="editPrijs" placeholder="bijv. 25,50">
+    </div>
+    <div class="form-group">
+      <label for="editWaarde">Waarde (verkoop/huidige waarde, in €)</label>
+      <input type="text" id="editWaarde" placeholder="bijv. 75,00">
+    </div>
+    <div class="form-group">
+      <label for="editVerkocht">Verkocht</label>
+      <select id="editVerkocht">
+        <option value="false">Nee</option>
+        <option value="true">Ja</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="editStaat">Staat</label>
+      <input type="text" id="editStaat">
+    </div>
+    <div class="form-group">
+      <label for="editDoos">Originele doos</label>
+      <select id="editDoos">
+        <option value="false">Nee</option>
+        <option value="true">Ja</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="editCancel">Annuleren</button>
+      <button class="btn-save" id="editSave">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allRows = [];
+  let filteredRows = [];
+  let sortCol = null;
+  let sortDir = 1;
+  let columns = [];
+  let excludedIds = new Set();
+  let bundleHeaderIds = new Set();
+  let colMap = {};          // canonical -> original CSV field name
+  let originalFileName = 'items-aangepast.csv';
+  let hasUnsavedChanges = false;
+  let editingRowId = null;
+
+  function rowId(r) {
+    // Unique identifier per row based on its position + name
+    return r._idx + '|' + r.naam;
+  }
+
+  // Compute effective prices for bundle items.
+  // A bundle header's Prijs is distributed to subsequent rows (in CSV order)
+  // until the next bundle header. Distribution is weighted by each item's Waarde:
+  // items with a higher Waarde get a proportionally larger share of the total price.
+  // If all child Waardes are 0 (or missing), falls back to equal split.
+  // The bundle header itself is excluded from totals.
+  function computeBundles() {
+    // Reset bundle state
+    allRows.forEach(r => {
+      r._effectivePrijs = r.prijs;
+      r._bundleWeight = null;   // fraction of bundle total (0..1)
+      r._isBundleHeader = false;
+      r._bundleHeaderId = null;
+      r._bundleSize = 0;
+      r._bundleDistribution = null; // 'weighted' or 'equal'
+    });
+
+    const ordered = [...allRows].sort((a, b) => a._idx - b._idx);
+    for (let i = 0; i < ordered.length; i++) {
+      const r = ordered[i];
+      if (!bundleHeaderIds.has(rowId(r))) continue;
+      // Find children: rows after this one, until the next bundle header
+      const children = [];
+      for (let j = i + 1; j < ordered.length; j++) {
+        if (bundleHeaderIds.has(rowId(ordered[j]))) break;
+        children.push(ordered[j]);
+      }
+      r._isBundleHeader = true;
+      r._bundleSize = children.length;
+
+      if (children.length === 0) continue;
+
+      const totalWaarde = children.reduce((s, c) => s + (c.waarde || 0), 0);
+
+      if (totalWaarde > 0) {
+        // Weighted distribution: price share proportional to Waarde
+        r._bundleDistribution = 'weighted';
+        children.forEach(c => {
+          const weight = (c.waarde || 0) / totalWaarde;
+          c._effectivePrijs = r.prijs * weight;
+          c._bundleWeight = weight;
+          c._bundleHeaderId = rowId(r);
+          c._bundleDistribution = 'weighted';
+        });
+      } else {
+        // Fallback: equal split when all Waardes are 0 / missing
+        r._bundleDistribution = 'equal';
+        const perItem = r.prijs / children.length;
+        children.forEach(c => {
+          c._effectivePrijs = perItem;
+          c._bundleWeight = 1 / children.length;
+          c._bundleHeaderId = rowId(r);
+          c._bundleDistribution = 'equal';
+        });
+      }
+    }
+  }
+
+  function toggleBundle(id) {
+    if (bundleHeaderIds.has(id)) bundleHeaderIds.delete(id);
+    else bundleHeaderIds.add(id);
+    computeBundles();
+    updateStats();
+    renderTable();
+    renderBundlesPanel();
+  }
+
+  function renderBundlesPanel() {
+    const panel = document.getElementById('bundlesPanel');
+    const list = document.getElementById('bundlesList');
+    if (bundleHeaderIds.size === 0) {
+      panel.classList.add('hidden');
+      return;
+    }
+    panel.classList.remove('hidden');
+    const headers = [...bundleHeaderIds].map(id => allRows.find(r => rowId(r) === id)).filter(Boolean);
+    headers.sort((a, b) => a._idx - b._idx);
+    list.innerHTML = headers.map(h => {
+      if (h._bundleSize === 0) {
+        return `<div style="padding: 6px 0; border-bottom: 1px solid #A5AE94;">
+          <strong>${escapeHtml(h.naam)}</strong> — ${formatEuro(h.prijs)}
+          <em>(geen items eronder gevonden)</em>
+        </div>`;
+      }
+      const method = h._bundleDistribution === 'weighted'
+        ? '<span class="bundle-note">Gewogen naar Waarde</span>'
+        : '<span class="bundle-note" style="background:#B87F2B;">Gelijk verdeeld (alle Waardes = 0)</span>';
+      return `<div style="padding: 6px 0; border-bottom: 1px solid #A5AE94;">
+        <strong>${escapeHtml(h.naam)}</strong> — ${formatEuro(h.prijs)}
+        verdeeld over <strong>${h._bundleSize}</strong> items
+        ${method}
+      </div>`;
+    }).join('');
+  }
+
+  function toggleExclude(id) {
+    if (excludedIds.has(id)) excludedIds.delete(id);
+    else excludedIds.add(id);
+    saveExclusions();
+    updateStats();
+    renderTable();
+    renderExclusionsPanel();
+  }
+
+  function saveExclusions() {
+    // In-memory only — no localStorage per environment constraints
+  }
+
+  function clearAllExclusions() {
+    excludedIds.clear();
+    updateStats();
+    renderTable();
+    renderExclusionsPanel();
+  }
+
+  function renderExclusionsPanel() {
+    const panel = document.getElementById('exclusionsPanel');
+    const list = document.getElementById('exclusionsList');
+    const count = document.getElementById('exclusionCount');
+    if (excludedIds.size === 0) {
+      panel.classList.add('hidden');
+      return;
+    }
+    panel.classList.remove('hidden');
+    count.textContent = excludedIds.size;
+    const chips = [...excludedIds].map(id => {
+      const row = allRows.find(r => rowId(r) === id);
+      const label = row ? (row.naam || '(zonder naam)') + (row.merk ? ' · ' + row.merk : '') : id;
+      return `<span class="exclusion-chip">${escapeHtml(label)}<button data-id="${escapeHtml(id)}" title="Terughalen">×</button></span>`;
+    }).join('');
+    list.innerHTML = chips;
+    list.querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => toggleExclude(btn.dataset.id));
+    });
+  }
+
+  const fileInput = document.getElementById('fileInput');
+  const uploadZone = document.getElementById('uploadZone');
+  const errorMsg = document.getElementById('errorMsg');
+  const dashboard = document.getElementById('dashboard');
+  const debugLog = document.getElementById('debugLog');
+  const debugToggle = document.getElementById('debugToggle');
+
+  function dbg(msg) {
+    const t = new Date().toLocaleTimeString('nl-NL', {hour12:false}) + '.' + String(new Date().getMilliseconds()).padStart(3,'0');
+    if (debugLog) debugLog.textContent += '[' + t + '] ' + msg + '\n';
+    try { console.log('[debug]', msg); } catch(e) {}
+  }
+  debugToggle.addEventListener('click', () => {
+    if (debugLog.style.display === 'none') { debugLog.style.display = 'block'; debugToggle.textContent = '🔍 Debug log verbergen'; }
+    else { debugLog.style.display = 'none'; debugToggle.textContent = '🔍 Debug log tonen'; }
+  });
+  dbg('JS geladen. UserAgent: ' + navigator.userAgent);
+
+  // Drag & drop
+  uploadZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    dbg('drop event, files=' + e.dataTransfer.files.length);
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', e => {
+    dbg('change event, files=' + (e.target.files ? e.target.files.length : 'null'));
+    if (e.target.files && e.target.files.length) handleFile(e.target.files[0]);
+    else dbg('change event maar geen bestand in files[]');
+  });
+  fileInput.addEventListener('input', e => {
+    dbg('input event, files=' + (e.target.files ? e.target.files.length : 'null'));
+  });
+  uploadZone.addEventListener('click', () => dbg('uploadZone click'));
+
+  function showStatus(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.remove('hidden');
+    errorMsg.style.background = '#FDF6E3';
+    errorMsg.style.color = '#5C5D2A';
+    errorMsg.style.border = '1px solid #C9BFA8';
+  }
+  function clearStatus() {
+    errorMsg.classList.add('hidden');
+    errorMsg.style.background = '';
+    errorMsg.style.color = '';
+    errorMsg.style.border = '';
+  }
+
+  function handleFile(file) {
+    dbg('handleFile start');
+    clearStatus();
+    if (!file) { dbg('FAIL: geen file'); showError('Geen bestand geselecteerd.'); return; }
+    dbg('file: name=' + file.name + ' size=' + file.size + ' type=' + (file.type||'leeg'));
+    showStatus('📄 Bestand ontvangen: ' + file.name + ' (' + (file.size||0) + ' bytes). Inlezen...');
+    // Derive a sensible download filename from the input
+    const base = file.name.replace(/\.csv$/i, '');
+    originalFileName = base + '-aangepast.csv';
+
+    // Read as text first — more reliable on iOS Safari (iCloud/Files app sometimes returns
+    // File objects Papa.parse cannot stream directly).
+    const reader = new FileReader();
+    reader.onerror = () => {
+      dbg('FileReader error: ' + (reader.error && reader.error.message ? reader.error.message : 'onbekend'));
+      showError('FileReader fout: ' + (reader.error && reader.error.message ? reader.error.message : 'onbekend'));
+    };
+    reader.onload = () => {
+      dbg('FileReader onload, result length=' + (reader.result ? reader.result.length : 'null'));
+      let text = reader.result;
+      if (typeof text !== 'string') {
+        showError('Bestand kon niet als tekst gelezen worden.');
+        return;
+      }
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      if (!text.trim()) { showError('Bestand is leeg.'); return; }
+      showStatus('⏳ Parsen van CSV (' + text.length + ' tekens)...');
+      try {
+        const results = Papa.parse(text, {
+          header: true, skipEmptyLines: true, dynamicTyping: false,
+          delimitersToGuess: [',', ';', '\t', '|']
+        });
+        dbg('Papa parsed ' + (results.data ? results.data.length : 0) + ' rows, fields=' + JSON.stringify(results.meta && results.meta.fields));
+        if (results.errors && results.errors.length > 0) console.warn('CSV parse warnings:', results.errors);
+        if (!results.data || results.data.length === 0) {
+          showError('Geen data gevonden in "' + file.name + '". Eerste regel: ' + text.split('\n')[0].slice(0, 120));
+          return;
+        }
+        try {
+          processData(results.data, results.meta.fields);
+          dbg('processData OK');
+          clearStatus();
+        } catch (err) {
+          dbg('processData ERROR: ' + err.message);
+          showError('Fout bij verwerken: ' + err.message);
+        }
+      } catch (err) {
+        dbg('Papa ERROR: ' + err.message);
+        showError('Fout bij parsen: ' + (err && err.message ? err.message : String(err)));
+      }
+    };
+    try {
+      reader.readAsText(file, 'UTF-8');
+      dbg('readAsText aangeroepen');
+    } catch (err) {
+      dbg('readAsText gooide: ' + err.message);
+      showError('Kan bestand niet openen: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.remove('hidden');
+    dashboard.classList.add('hidden');
+  }
+
+  // Parse a European-formatted number: "1.234,56" or "1234,56" or "12.34" or "12,34"
+  function parseNumber(val) {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return val;
+    let s = String(val).trim();
+    if (!s) return 0;
+    // Remove currency symbols and spaces
+    s = s.replace(/[€$£\s]/g, '');
+    // If contains both . and , assume . is thousand sep, , is decimal
+    if (s.includes('.') && s.includes(',')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else if (s.includes(',')) {
+      // Just a comma - treat as decimal
+      s = s.replace(',', '.');
+    }
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function parseBool(val) {
+    if (val === true) return true;
+    if (val === false) return false;
+    if (val === null || val === undefined) return false;
+    const s = String(val).trim().toLowerCase();
+    return ['ja', 'yes', 'y', 'true', '1', 'waar', 'x', 'verkocht'].includes(s);
+  }
+
+  // Find a column by fuzzy match
+  function findCol(fields, candidates) {
+    const lower = fields.map(f => (f || '').toLowerCase().trim());
+    for (const cand of candidates) {
+      const idx = lower.indexOf(cand.toLowerCase());
+      if (idx !== -1) return fields[idx];
+    }
+    // Partial match
+    for (const cand of candidates) {
+      const idx = lower.findIndex(f => f.includes(cand.toLowerCase()));
+      if (idx !== -1) return fields[idx];
+    }
+    return null;
+  }
+
+  function formatEuro(n) {
+    return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function processData(rawData, fields) {
+    columns = fields;
+    const colNaam = findCol(fields, ['Naam', 'Name', 'Item']);
+    const colMerk = findCol(fields, ['Merk', 'Brand']);
+    const colPrijs = findCol(fields, ['Prijs', 'Price', 'Inkoop', 'Inkoopprijs']);
+    const colWaarde = findCol(fields, ['Waarde', 'Value', 'Verkoopprijs']);
+    const colVerkocht = findCol(fields, ['Verkocht', 'Sold']);
+    const colStaat = findCol(fields, ['staat', 'Staat', 'Condition']);
+    const colDoos = findCol(fields, ['originele doos', 'Originele doos', 'Doos', 'Box']);
+
+    colMap = {
+      naam: colNaam, merk: colMerk, prijs: colPrijs, waarde: colWaarde,
+      verkocht: colVerkocht, staat: colStaat, doos: colDoos
+    };
+
+    allRows = rawData.map((r, idx) => ({
+      _idx: idx,
+      naam: colNaam ? (r[colNaam] || '') : '',
+      merk: colMerk ? (r[colMerk] || '') : '',
+      prijs: parseNumber(colPrijs ? r[colPrijs] : 0),
+      waarde: parseNumber(colWaarde ? r[colWaarde] : 0),
+      verkocht: colVerkocht ? parseBool(r[colVerkocht]) : false,
+      staat: colStaat ? (r[colStaat] || '') : '',
+      doos: colDoos ? parseBool(r[colDoos]) : false,
+      _raw: { ...r }
+    }));
+
+    hasUnsavedChanges = false;
+    updateUnsavedBadge();
+
+    excludedIds.clear();
+    bundleHeaderIds.clear();
+
+    // Auto-detect bundle headers for "Marktplaats puzzles*" / "Marktplaats bundel*"
+    allRows.forEach(r => {
+      if (/^marktplaats\s+(puzzles?|bundel)\s*\d+/i.test(r.naam.trim())) {
+        bundleHeaderIds.add(rowId(r));
+      }
+    });
+
+    computeBundles();
+    populateFilters();
+    filteredRows = [...allRows];
+    updateStats();
+    renderTable();
+    renderExclusionsPanel();
+    renderBundlesPanel();
+    dashboard.classList.remove('hidden');
+  }
+
+  function populateFilters() {
+    const brands = [...new Set(allRows.map(r => r.merk).filter(Boolean))].sort();
+    const brandSel = document.getElementById('brandFilter');
+    brandSel.innerHTML = '<option value="">Alle merken</option>' +
+      brands.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+
+    const states = [...new Set(allRows.map(r => r.staat).filter(Boolean))].sort();
+    const stateSel = document.getElementById('conditionFilter');
+    stateSel.innerHTML = '<option value="">Alle staten</option>' +
+      states.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    const brand = document.getElementById('brandFilter').value;
+    const sold = document.getElementById('soldFilter').value;
+    const cond = document.getElementById('conditionFilter').value;
+    const box = document.getElementById('boxFilter').value;
+
+    filteredRows = allRows.filter(r => {
+      if (q && !r.naam.toLowerCase().includes(q) && !r.merk.toLowerCase().includes(q)) return false;
+      if (brand && r.merk !== brand) return false;
+      if (sold === 'yes' && !r.verkocht) return false;
+      if (sold === 'no' && r.verkocht) return false;
+      if (cond && r.staat !== cond) return false;
+      if (box === 'yes' && !r.doos) return false;
+      if (box === 'no' && r.doos) return false;
+      return true;
+    });
+
+    updateStats();
+    renderTable();
+  }
+
+  function updateStats() {
+    // Exclude: manually excluded rows AND bundle headers (their price is already distributed)
+    const activeRows = filteredRows.filter(r => !excludedIds.has(rowId(r)) && !r._isBundleHeader);
+    const excludedInView = filteredRows.filter(r => excludedIds.has(rowId(r))).length;
+    const bundleHeadersInView = filteredRows.filter(r => r._isBundleHeader).length;
+
+    // Use effective prices (distributed bundle prices)
+    const effPrijs = r => (r._effectivePrijs !== undefined ? r._effectivePrijs : r.prijs);
+
+    const totalSpent = activeRows.reduce((s, r) => s + effPrijs(r), 0);
+    const sold = activeRows.filter(r => r.verkocht);
+    const totalSold = sold.reduce((s, r) => s + r.waarde, 0);
+    const totalSoldCost = sold.reduce((s, r) => s + effPrijs(r), 0);
+    const profit = totalSold - totalSoldCost;
+    const unsold = activeRows.filter(r => !r.verkocht);
+    const portfolioValue = unsold.reduce((s, r) => s + r.waarde, 0);
+
+    document.getElementById('statTotalSpent').textContent = formatEuro(totalSpent);
+    const itemsEl = document.getElementById('statTotalItems');
+    const notes = [];
+    if (excludedInView > 0) notes.push(excludedInView + ' uitgesloten');
+    if (bundleHeadersInView > 0) notes.push(bundleHeadersInView + ' bundel-header(s) verdeeld');
+    itemsEl.textContent = activeRows.length + ' items gekocht' +
+      (notes.length > 0 ? ' (' + notes.join(', ') + ')' : '');
+    itemsEl.className = 'sub' + (notes.length > 0 ? ' excluded-note' : '');
+
+    const profitEl = document.getElementById('statProfit');
+    profitEl.textContent = (profit >= 0 ? '+' : '') + formatEuro(profit);
+    profitEl.className = 'value ' + (profit >= 0 ? 'positive' : 'negative');
+    document.getElementById('statProfitDetail').textContent =
+      sold.length + ' verkocht · inkoop ' + formatEuro(totalSoldCost);
+
+    document.getElementById('statTotalSold').textContent = formatEuro(totalSold);
+    document.getElementById('statSoldCount').textContent = sold.length + ' items verkocht';
+
+    document.getElementById('statPortfolio').textContent = formatEuro(portfolioValue);
+    document.getElementById('statPortfolioCount').textContent = unsold.length + ' items in bezit';
+
+    renderTopLists();
+  }
+
+  function renderTable() {
+    const head = document.getElementById('tableHead');
+    const body = document.getElementById('tableBody');
+    const count = document.getElementById('itemCount');
+
+    const cols = [
+      { key: 'naam', label: 'Naam' },
+      { key: 'merk', label: 'Merk' },
+      { key: 'prijs', label: 'Prijs', num: true },
+      { key: 'waarde', label: 'Waarde', num: true },
+      { key: 'winst', label: 'Winst', num: true, calc: r => r.verkocht ? r.waarde - r.prijs : null },
+      { key: 'verkocht', label: 'Verkocht', bool: true },
+      { key: 'staat', label: 'Staat' },
+      { key: 'doos', label: 'Originele doos', bool: true },
+      { key: 'actie', label: 'Actie', sortable: false }
+    ];
+
+    head.innerHTML = cols.map(c => {
+      if (c.sortable === false) {
+        return `<th class="${c.num ? 'num' : ''}">${c.label}</th>`;
+      }
+      const arrow = sortCol === c.key ? (sortDir > 0 ? '▲' : '▼') : '↕';
+      return `<th data-col="${c.key}" class="${c.num ? 'num' : ''}">${c.label} <span class="sort-indicator">${arrow}</span></th>`;
+    }).join('');
+
+    head.querySelectorAll('th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) sortDir = -sortDir;
+        else { sortCol = col; sortDir = 1; }
+        renderTable();
+      });
+    });
+
+    let rows = [...filteredRows];
+    if (sortCol) {
+      const colDef = cols.find(c => c.key === sortCol);
+      rows.sort((a, b) => {
+        let va, vb;
+        if (colDef.calc) { va = colDef.calc(a); vb = colDef.calc(b); }
+        else { va = a[sortCol]; vb = b[sortCol]; }
+        if (va === null || va === undefined) va = -Infinity;
+        if (vb === null || vb === undefined) vb = -Infinity;
+        if (typeof va === 'string') return va.localeCompare(vb) * sortDir;
+        if (typeof va === 'boolean') return ((va === vb) ? 0 : va ? -1 : 1) * sortDir;
+        return (va - vb) * sortDir;
+      });
+    }
+
+    if (rows.length === 0) {
+      body.innerHTML = '<tr><td colspan="9" class="empty-state">Geen items gevonden met deze filters</td></tr>';
+    } else {
+      body.innerHTML = rows.map(r => {
+        const id = rowId(r);
+        const isExcluded = excludedIds.has(id);
+        const isBundleHeader = r._isBundleHeader;
+        const isBundleItem = !!r._bundleHeaderId;
+        const effPrijs = r._effectivePrijs !== undefined ? r._effectivePrijs : r.prijs;
+
+        // Winst calc: bundle headers use their own totals (prijs vs waarde from CSV)
+        // Bundle items use distributed (effective) prijs vs their own waarde
+        const winstPrijs = isBundleHeader ? r.prijs : effPrijs;
+        const winst = r.verkocht ? r.waarde - winstPrijs : null;
+        const winstClass = winst === null ? '' : (winst >= 0 ? 'positive' : 'negative');
+        const winstStr = winst === null ? '—' : (winst >= 0 ? '+' : '') + formatEuro(winst);
+
+        const excludeBtnLabel = isExcluded ? 'Terughalen' : 'Uitsluiten';
+        const excludeBtnClass = isExcluded ? 'exclude-btn active' : 'exclude-btn';
+        const bundleBtnLabel = isBundleHeader ? 'Bundel opheffen' : 'Als bundel';
+        const bundleBtnClass = isBundleHeader ? 'bundle-btn active' : 'bundle-btn';
+
+        // Price cell: show distributed price for bundle items, with original struck through
+        let prijsCell;
+        if (isBundleHeader) {
+          prijsCell = `<td class="num">${formatEuro(r.prijs)}<span class="bundle-note">Totaal</span></td>`;
+        } else if (isBundleItem) {
+          const pct = r._bundleWeight != null ? (r._bundleWeight * 100).toFixed(1) + '%' : '';
+          const pctLabel = pct ? `<div style="font-size:10px;color:#5C5D2A;opacity:0.8;">${pct} van bundel</div>` : '';
+          prijsCell = `<td class="num"><span class="original-price">${formatEuro(r.prijs)}</span><span class="distributed-price">${formatEuro(effPrijs)}</span>${pctLabel}</td>`;
+        } else {
+          prijsCell = `<td class="num">${formatEuro(r.prijs)}</td>`;
+        }
+
+        const rowClasses = [];
+        if (isExcluded) rowClasses.push('excluded');
+        if (isBundleHeader) rowClasses.push('bundle-header');
+        if (isBundleItem) rowClasses.push('bundle-item');
+
+        const bundleLabel = isBundleHeader
+          ? `<span class="bundle-note">Bundel · ${r._bundleSize} items</span>` : '';
+
+        // Update prijsCell to include data-label
+        const prijsCellLabeled = prijsCell.replace('<td class="num"', '<td class="num" data-label="Prijs"');
+        return `<tr class="${rowClasses.join(' ')}">
+          <td data-label="Naam">${escapeHtml(r.naam)}${bundleLabel}</td>
+          <td data-label="Merk">${escapeHtml(r.merk)}</td>
+          ${prijsCellLabeled}
+          <td class="num" data-label="Waarde">${formatEuro(r.waarde)}${isBundleHeader ? '<span class="bundle-note">Totaal</span>' : ''}</td>
+          <td class="num ${winstClass}" data-label="Winst"><strong>${winstStr}</strong></td>
+          <td data-label="Verkocht"><span class="badge ${r.verkocht ? 'badge-yes' : 'badge-no'}">${r.verkocht ? 'Ja' : 'Nee'}</span></td>
+          <td data-label="Staat">${escapeHtml(r.staat)}</td>
+          <td data-label="Originele doos"><span class="badge ${r.doos ? 'badge-yes' : 'badge-no'}">${r.doos ? 'Ja' : 'Nee'}</span></td>
+          <td class="action-cell" data-label="Actie">
+            <button class="edit-btn" data-edit-id="${escapeHtml(id)}">Bewerk</button>
+            <button class="${excludeBtnClass}" data-exclude-id="${escapeHtml(id)}">${excludeBtnLabel}</button>
+            <button class="${bundleBtnClass}" data-bundle-id="${escapeHtml(id)}">${bundleBtnLabel}</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      body.querySelectorAll('button[data-exclude-id]').forEach(btn => {
+        btn.addEventListener('click', () => toggleExclude(btn.dataset.excludeId));
+      });
+      body.querySelectorAll('button[data-bundle-id]').forEach(btn => {
+        btn.addEventListener('click', () => toggleBundle(btn.dataset.bundleId));
+      });
+      body.querySelectorAll('button[data-edit-id]').forEach(btn => {
+        btn.addEventListener('click', () => openEdit(btn.dataset.editId));
+      });
+    }
+
+    const activeCount = rows.filter(r => !excludedIds.has(rowId(r)) && !r._isBundleHeader).length;
+    const excludedCount = rows.filter(r => excludedIds.has(rowId(r))).length;
+    const bundleCount = rows.filter(r => r._isBundleHeader).length;
+    const extras = [];
+    if (excludedCount > 0) extras.push(excludedCount + ' uitgesloten');
+    if (bundleCount > 0) extras.push(bundleCount + ' bundel-header(s)');
+    count.textContent = activeCount + ' item' + (activeCount === 1 ? '' : 's') +
+      (extras.length > 0 ? ' (' + extras.join(', ') + ')' : '');
+  }
+
+  // ===== Edit modal =====
+  function formatNumberForCsv(n) {
+    // European format: 12,50 (not 12.50)
+    return Number(n).toFixed(2).replace('.', ',');
+  }
+
+  function openEdit(id) {
+    const row = allRows.find(r => rowId(r) === id);
+    if (!row) return;
+    editingRowId = id;
+    document.getElementById('editNaam').value = row.naam;
+    document.getElementById('editMerk').value = row.merk;
+    document.getElementById('editPrijs').value = formatNumberForCsv(row.prijs);
+    document.getElementById('editWaarde').value = formatNumberForCsv(row.waarde);
+    document.getElementById('editVerkocht').value = row.verkocht ? 'true' : 'false';
+    document.getElementById('editStaat').value = row.staat;
+    document.getElementById('editDoos').value = row.doos ? 'true' : 'false';
+    document.getElementById('editModal').classList.add('active');
+  }
+
+  function closeEdit() {
+    editingRowId = null;
+    document.getElementById('editModal').classList.remove('active');
+  }
+
+  function saveEdit() {
+    if (!editingRowId) return;
+    const row = allRows.find(r => rowId(r) === editingRowId);
+    if (!row) return;
+
+    const oldNaam = row.naam;
+    row.naam = document.getElementById('editNaam').value;
+    row.merk = document.getElementById('editMerk').value;
+    row.prijs = parseNumber(document.getElementById('editPrijs').value);
+    row.waarde = parseNumber(document.getElementById('editWaarde').value);
+    row.verkocht = document.getElementById('editVerkocht').value === 'true';
+    row.staat = document.getElementById('editStaat').value;
+    row.doos = document.getElementById('editDoos').value === 'true';
+
+    // Write back to _raw so export preserves original column names
+    if (colMap.naam) row._raw[colMap.naam] = row.naam;
+    if (colMap.merk) row._raw[colMap.merk] = row.merk;
+    if (colMap.prijs) row._raw[colMap.prijs] = formatNumberForCsv(row.prijs);
+    if (colMap.waarde) row._raw[colMap.waarde] = formatNumberForCsv(row.waarde);
+    if (colMap.verkocht) row._raw[colMap.verkocht] = row.verkocht ? 'Ja' : 'Nee';
+    if (colMap.staat) row._raw[colMap.staat] = row.staat;
+    if (colMap.doos) row._raw[colMap.doos] = row.doos ? 'Ja' : 'Nee';
+
+    // If the name changed, the rowId changed too — migrate exclude/bundle state
+    const newId = rowId(row);
+    const oldId = row._idx + '|' + oldNaam;
+    if (newId !== oldId) {
+      if (excludedIds.has(oldId)) { excludedIds.delete(oldId); excludedIds.add(newId); }
+      if (bundleHeaderIds.has(oldId)) { bundleHeaderIds.delete(oldId); bundleHeaderIds.add(newId); }
+    }
+
+    hasUnsavedChanges = true;
+    updateUnsavedBadge();
+
+    // Re-detect bundles (e.g. if a name was changed to/from "Marktplaats puzzles")
+    computeBundles();
+    populateFilters();
+    applyFilters();
+    renderExclusionsPanel();
+    renderBundlesPanel();
+    closeEdit();
+  }
+
+  function updateUnsavedBadge() {
+    const badge = document.getElementById('unsavedBadge');
+    if (hasUnsavedChanges) badge.classList.remove('hidden');
+    else badge.classList.add('hidden');
+  }
+
+  function exportCsv() {
+    if (allRows.length === 0) return;
+    // Build data using original field order, falling back to all keys
+    const fields = columns && columns.length ? columns : Object.keys(allRows[0]._raw);
+    const rows = [...allRows].sort((a, b) => a._idx - b._idx).map(r => {
+      const obj = {};
+      fields.forEach(f => { obj[f] = r._raw[f] != null ? r._raw[f] : ''; });
+      return obj;
+    });
+    const csv = Papa.unparse(rows, { delimiter: ';', quotes: false });
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = originalFileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    hasUnsavedChanges = false;
+    updateUnsavedBadge();
+  }
+
+  // ===== Top 5 rankings =====
+  function rankClass(i) {
+    if (i === 0) return 'top-rank gold';
+    if (i === 1) return 'top-rank silver';
+    if (i === 2) return 'top-rank bronze';
+    return 'top-rank';
+  }
+
+  function renderTopLists() {
+    if (document.getElementById('topPanel').classList.contains('hidden')) return;
+
+    // Pool: filtered rows, excluding bundle headers and manually excluded items
+    const pool = filteredRows.filter(r => !excludedIds.has(rowId(r)) && !r._isBundleHeader);
+    const effPrijs = r => (r._effectivePrijs !== undefined ? r._effectivePrijs : r.prijs);
+
+    // 1. Duurste in aanschaf (by effective price)
+    const expensive = [...pool]
+      .filter(r => effPrijs(r) > 0)
+      .sort((a, b) => effPrijs(b) - effPrijs(a))
+      .slice(0, 5);
+
+    renderList('topExpensive', expensive, r => ({
+      name: r.naam || '(zonder naam)',
+      sub: r.merk + (r._bundleHeaderId ? ' · bundel-aandeel' : ''),
+      value: formatEuro(effPrijs(r))
+    }));
+
+    // 2. Meeste winst (sold only, by Waarde - effective Prijs)
+    const profit = pool
+      .filter(r => r.verkocht)
+      .map(r => ({ row: r, winst: r.waarde - effPrijs(r) }))
+      .sort((a, b) => b.winst - a.winst)
+      .slice(0, 5);
+
+    renderList('topProfit', profit.map(p => p.row), (r, i) => {
+      const w = profit[i].winst;
+      return {
+        name: r.naam || '(zonder naam)',
+        sub: `${r.merk} · inkoop ${formatEuro(effPrijs(r))} → verkoop ${formatEuro(r.waarde)}`,
+        value: (w >= 0 ? '+' : '') + formatEuro(w),
+        valueClass: w >= 0 ? 'positive' : 'negative'
+      };
+    });
+
+    // 3. Vaakst over de kop (ratio Waarde / effective Prijs, sold only)
+    const ratio = pool
+      .filter(r => r.verkocht && effPrijs(r) > 0)
+      .map(r => ({ row: r, ratio: r.waarde / effPrijs(r) }))
+      .sort((a, b) => b.ratio - a.ratio)
+      .slice(0, 5);
+
+    renderList('topRatio', ratio.map(p => p.row), (r, i) => {
+      const x = ratio[i].ratio;
+      return {
+        name: r.naam || '(zonder naam)',
+        sub: `${r.merk} · ${formatEuro(effPrijs(r))} → ${formatEuro(r.waarde)}`,
+        value: x.toFixed(2).replace('.', ',') + '×',
+        valueClass: x >= 1 ? 'positive' : 'negative'
+      };
+    });
+  }
+
+  function renderList(elId, rows, mapper) {
+    const el = document.getElementById(elId);
+    if (rows.length === 0) {
+      el.innerHTML = '<li class="top-empty">Geen items in deze selectie</li>';
+      return;
+    }
+    el.innerHTML = rows.map((r, i) => {
+      const m = mapper(r, i);
+      const valClass = m.valueClass ? ` ${m.valueClass}` : '';
+      return `<li>
+        <span class="${rankClass(i)}">${i + 1}</span>
+        <div>
+          <div class="top-item-name">${escapeHtml(m.name)}</div>
+          <div class="top-item-sub">${escapeHtml(m.sub || '')}</div>
+        </div>
+        <span class="top-item-value${valClass}">${escapeHtml(m.value)}</span>
+      </li>`;
+    }).join('');
+  }
+
+  // Wire up filter events
+  ['searchInput', 'brandFilter', 'soldFilter', 'conditionFilter', 'boxFilter'].forEach(id => {
+    document.getElementById(id).addEventListener('input', applyFilters);
+    document.getElementById(id).addEventListener('change', applyFilters);
+  });
+
+  document.getElementById('clearExclusions').addEventListener('click', clearAllExclusions);
+
+  // Top 5 toggle
+  document.getElementById('topToggle').addEventListener('click', () => {
+    const panel = document.getElementById('topPanel');
+    const btn = document.getElementById('topToggle');
+    const hidden = panel.classList.toggle('hidden');
+    btn.textContent = hidden ? '🏆 Top 5 lijsten tonen' : '🏆 Top 5 lijsten verbergen';
+    if (!hidden) renderTopLists();
+  });
+
+  // Deals zoeken
+  const DEALS_BRANDS = [
+    'Karakuri', 'Naef', 'Revomaze', 'Felix Ure', 'Benno de Grote',
+    'Bill Cutler', 'Dee Dixon', 'Frans de Vreugd', 'Juno', 'Jesse Born',
+    'MWpuzzles', 'Pentangle', 'Perry McDaniel', 'Bill Sheckels'
+  ];
+  function mpUrl(brand) {
+    return 'https://www.marktplaats.nl/q/' + encodeURIComponent(brand.toLowerCase().replace(/\s+/g, '-')) + '/';
+  }
+  function tdhUrl(brand) {
+    return 'https://www.2dehands.be/q/' + encodeURIComponent(brand.toLowerCase().replace(/\s+/g, '-')) + '/';
+  }
+  function vtUrl(brand) {
+    return 'https://www.vinted.nl/catalog?search_text=' + encodeURIComponent(brand) + '&order=newest_first';
+  }
+  function renderDealsList() {
+    const list = document.getElementById('dealsList');
+    list.innerHTML = DEALS_BRANDS.map(b => `
+      <div class="deal-row">
+        <span class="brand-name">${escapeHtml(b)}</span>
+        <div class="deal-buttons">
+          <a class="mp" href="${mpUrl(b)}" target="_blank" rel="noopener noreferrer">📦 Marktplaats</a>
+          <a class="tdh" href="${tdhUrl(b)}" target="_blank" rel="noopener noreferrer">🇧🇪 2dehands</a>
+          <a class="vt" href="${vtUrl(b)}" target="_blank" rel="noopener noreferrer">👕 Vinted</a>
+        </div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('dealsToggle').addEventListener('click', () => {
+    const panel = document.getElementById('dealsPanel');
+    const btn = document.getElementById('dealsToggle');
+    const hidden = panel.classList.toggle('hidden');
+    btn.textContent = hidden ? '🔍 Deals zoeken tonen' : '🔍 Deals zoeken verbergen';
+    if (!hidden) renderDealsList();
+  });
+  document.getElementById('dealsOpenAllMp').addEventListener('click', () => {
+    DEALS_BRANDS.forEach(b => window.open(mpUrl(b), '_blank', 'noopener,noreferrer'));
+  });
+  document.getElementById('dealsOpenAllTdh').addEventListener('click', () => {
+    DEALS_BRANDS.forEach(b => window.open(tdhUrl(b), '_blank', 'noopener,noreferrer'));
+  });
+  document.getElementById('dealsOpenAllVt').addEventListener('click', () => {
+    DEALS_BRANDS.forEach(b => window.open(vtUrl(b), '_blank', 'noopener,noreferrer'));
+  });
+
+  // Edit modal + export
+  document.getElementById('editCancel').addEventListener('click', closeEdit);
+  document.getElementById('editSave').addEventListener('click', saveEdit);
+  document.getElementById('editModal').addEventListener('click', e => {
+    if (e.target.id === 'editModal') closeEdit();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('editModal').classList.contains('active')) {
+      closeEdit();
+    }
+  });
+  document.getElementById('exportBtn').addEventListener('click', exportCsv);
+
+  // Warn when leaving page with unsaved changes
+  window.addEventListener('beforeunload', e => {
+    if (hasUnsavedChanges) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+</script>
+
+</body>
+</html>
