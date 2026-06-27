@@ -1342,9 +1342,11 @@
     excludedIds.clear();
     bundleHeaderIds.clear();
 
-    // Auto-detect bundle headers for "Marktplaats puzzles*" / "Marktplaats bundel*"
+    // Auto-detect bundle headers for "Marktplaats puzzles*" / "Marktplaats bundel*" / "PP bundel*"
     allRows.forEach(r => {
-      if (/^marktplaats\s+(puzzles?|bundel)\s*\d+/i.test(r.naam.trim())) {
+      const naam = r.naam.trim();
+      if (/^marktplaats\s+(puzzles?|bundel)\s*\d*/i.test(naam) ||
+          /^pp\s+bundel\s*\d*/i.test(naam)) {
         bundleHeaderIds.add(rowId(r));
       }
     });
