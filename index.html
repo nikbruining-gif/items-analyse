@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Items Analyse Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
@@ -315,7 +318,63 @@
   .deals-bar {
     margin-bottom: 20px;
     display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
   }
+  .refresh-btn {
+    background: transparent;
+    color: #7A6B5D;
+    border: 1px solid #C9BFA8;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 44px;
+    line-height: 1.2;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover {
+    background: #F5F0DC;
+    border-color: #5C5D2A;
+    color: #5C5D2A;
+  }
+
+  #updateBanner {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #5C5D2A;
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    z-index: 3000;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 92vw;
+  }
+  #updateBanner a {
+    color: #F5F0DC;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  #updateBanner button {
+    background: rgba(255,255,255,0.18);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  #updateBanner button:hover { background: rgba(255,255,255,0.32); }
   .deals-toggle {
     background: #8B3A1F;
     color: white;
@@ -739,8 +798,8 @@
     .filter-row { grid-template-columns: 1fr; gap: 10px; }
 
     .top-bar { flex-direction: column; align-items: stretch; }
-    .deals-bar { display: block; }
-    .top-toggle, .deals-toggle, .export-btn {
+    .deals-bar { display: flex; flex-direction: column; gap: 8px; }
+    .top-toggle, .deals-toggle, .export-btn, .refresh-btn {
       justify-content: center;
       width: 100%;
       font-size: 14px;
@@ -953,6 +1012,7 @@
 
   <div class="deals-bar">
     <button class="deals-toggle" id="dealsToggle">🔍 Deals zoeken tonen</button>
+    <button class="refresh-btn" id="manualRefresh" title="Forceer een verse versie op te halen">🔄 Ververs app</button>
   </div>
 
   <div class="deals-panel hidden" id="dealsPanel">
@@ -1126,6 +1186,10 @@
 </div>
 
 <script>
+  // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
+  // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
+  const APP_VERSION = '2026-06-30-foto-upload';
+
   let allRows = [];
   let filteredRows = [];
   let sortCol = null;
@@ -1137,6 +1201,44 @@
   let originalFileName = 'items-aangepast.csv';
   let hasUnsavedChanges = false;
   let editingRowId = null;
+  let updateCheckInFlight = false;
+
+  function hardReload() {
+    const url = new URL(location.href);
+    url.searchParams.set('_t', Date.now());
+    location.replace(url.toString());
+  }
+
+  async function checkForUpdate() {
+    if (updateCheckInFlight) return;
+    updateCheckInFlight = true;
+    try {
+      const pathname = location.pathname.replace(/\/$/, '/index.html');
+      const url = pathname + '?_cb=' + Date.now();
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) return;
+      const text = await r.text();
+      const m = text.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+      if (m && m[1] && m[1] !== APP_VERSION) {
+        showUpdateBanner(m[1]);
+      }
+    } catch (e) {
+      console.warn('Update-check mislukt:', e);
+    } finally {
+      updateCheckInFlight = false;
+    }
+  }
+
+  function showUpdateBanner(newVersion) {
+    let banner = document.getElementById('updateBanner');
+    if (banner) return; // already visible
+    banner = document.createElement('div');
+    banner.id = 'updateBanner';
+    banner.innerHTML = '🔄 Nieuwe versie beschikbaar (' + newVersion + ') — <a href="#" id="updateBannerReload">tik hier om te herladen</a> <button id="updateBannerClose" aria-label="Sluiten">✕</button>';
+    document.body.appendChild(banner);
+    document.getElementById('updateBannerReload').addEventListener('click', e => { e.preventDefault(); hardReload(); });
+    document.getElementById('updateBannerClose').addEventListener('click', () => banner.remove());
+  }
 
   function rowId(r) {
     // Unique identifier per row based on its position + name
@@ -2137,6 +2239,16 @@
       e.returnValue = '';
     }
   });
+
+  // Automatic update detection — even a cached old version detects new ones
+  window.addEventListener('load', () => setTimeout(checkForUpdate, 1500));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForUpdate();
+  });
+
+  // Manual refresh button
+  const refreshBtn = document.getElementById('manualRefresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', hardReload);
 </script>
 
 </body>
