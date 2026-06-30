@@ -531,6 +531,111 @@
   }
 
   /* Modal */
+  .foto-thumb {
+    display: inline-block;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #F3EDE0;
+    border: 1px solid #E5DCC8;
+    cursor: zoom-in;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .foto-thumb:hover { transform: scale(1.06); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+  .foto-empty {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: #F3EDE0;
+    border: 1px dashed #D9CFB9;
+    color: #C9BFA8;
+    font-size: 18px;
+  }
+  .foto-preview {
+    display: block;
+    max-width: 100%;
+    max-height: 240px;
+    border-radius: 8px;
+    margin: 8px 0 6px 0;
+    border: 1px solid #E5DCC8;
+    object-fit: contain;
+    background: #F3EDE0;
+  }
+  .foto-hint {
+    font-size: 11px;
+    color: #7A6B5D;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .foto-hint code {
+    background: #F3EDE0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10.5px;
+  }
+  .foto-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .foto-btn {
+    background: #5C5D2A;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .foto-btn:hover { background: #464727; }
+  .foto-btn:disabled { background: #C9BFA8; cursor: wait; }
+  .foto-btn-clear {
+    background: transparent;
+    color: #8B3A1F;
+    border: 1px solid #D9CFB9;
+  }
+  .foto-btn-clear:hover { background: #FDF6E3; border-color: #8B3A1F; }
+  .lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    cursor: zoom-out;
+    padding: 24px;
+  }
+  .lightbox-overlay.active { display: flex; }
+  .lightbox-overlay img {
+    max-width: 95vw;
+    max-height: 95vh;
+    border-radius: 8px;
+    box-shadow: 0 10px 60px rgba(0,0,0,0.5);
+  }
+  .lightbox-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,0.3); }
+
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -707,6 +812,21 @@
       letter-spacing: 0.3px;
       text-align: left;
       flex-shrink: 0;
+    }
+
+    /* Foto row on mobile: big centered thumbnail, hide label */
+    tbody td[data-label="Foto"] {
+      justify-content: center;
+      padding: 4px 0 10px 0;
+      border-bottom: 1px solid #E5DCC8;
+    }
+    tbody td[data-label="Foto"]::before { display: none; }
+    tbody td[data-label="Foto"] .foto-thumb,
+    tbody td[data-label="Foto"] .foto-empty {
+      width: 110px;
+      height: 110px;
+      border-radius: 10px;
+      font-size: 32px;
     }
 
     /* Naam row: bigger, no label visible, full width */
@@ -981,11 +1101,28 @@
         <option value="true">Ja</option>
       </select>
     </div>
+    <div class="form-group">
+      <label for="editFoto">Foto</label>
+      <img id="editFotoPreview" class="foto-preview" alt="" style="display:none;">
+      <input type="text" id="editFoto" placeholder="bv. karakuri-doos.jpg of een volledige URL">
+      <div class="foto-actions">
+        <input type="file" id="editFotoFile" accept="image/*" style="display:none;">
+        <button type="button" class="foto-btn" id="editFotoPick">📸 Kies foto van apparaat</button>
+        <button type="button" class="foto-btn foto-btn-clear" id="editFotoClear">🗑️ Verwijderen</button>
+      </div>
+      <p class="foto-hint" id="editFotoStatus" style="display:none;"></p>
+      <p class="foto-hint">📁 Bestandsnamen verwijzen naar je <code>images/</code> map in je GitHub repo. Plak alternatief een volledige <code>https://…</code> URL. <br>📸 Bij "Kies foto" wordt de afbeelding gecomprimeerd naar max 1200px, gedownload naar je apparaat, en de bestandsnaam ingevuld — je hoeft 'm alleen nog naar je GitHub <code>images/</code> map te uploaden.</p>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="editCancel">Annuleren</button>
       <button class="btn-save" id="editSave">Opslaan</button>
     </div>
   </div>
+</div>
+
+<div class="lightbox-overlay" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose" aria-label="Sluiten">✕</button>
+  <img id="lightboxImg" alt="">
 </div>
 
 <script>
@@ -1310,7 +1447,7 @@
   }
 
   function processData(rawData, fields) {
-    columns = fields;
+    columns = [...fields];
     const colNaam = findCol(fields, ['Naam', 'Name', 'Item']);
     const colMerk = findCol(fields, ['Merk', 'Brand']);
     const colPrijs = findCol(fields, ['Prijs', 'Price', 'Inkoop', 'Inkoopprijs']);
@@ -1318,10 +1455,16 @@
     const colVerkocht = findCol(fields, ['Verkocht', 'Sold']);
     const colStaat = findCol(fields, ['staat', 'Staat', 'Condition']);
     const colDoos = findCol(fields, ['originele doos', 'Originele doos', 'Doos', 'Box']);
+    let colFoto = findCol(fields, ['foto', 'Foto', 'photo', 'Photo', 'image', 'Image', 'afbeelding', 'Afbeelding']);
+    // Ensure foto column exists so CSV export preserves it
+    if (!colFoto) {
+      colFoto = 'Foto';
+      if (!columns.includes(colFoto)) columns.push(colFoto);
+    }
 
     colMap = {
       naam: colNaam, merk: colMerk, prijs: colPrijs, waarde: colWaarde,
-      verkocht: colVerkocht, staat: colStaat, doos: colDoos
+      verkocht: colVerkocht, staat: colStaat, doos: colDoos, foto: colFoto
     };
 
     allRows = rawData.map((r, idx) => ({
@@ -1333,7 +1476,8 @@
       verkocht: colVerkocht ? parseBool(r[colVerkocht]) : false,
       staat: colStaat ? (r[colStaat] || '') : '',
       doos: colDoos ? parseBool(r[colDoos]) : false,
-      _raw: { ...r }
+      foto: colFoto ? ((r[colFoto] || '') + '').trim() : '',
+      _raw: { ...r, [colFoto]: ((r[colFoto] || '') + '').trim() }
     }));
 
     hasUnsavedChanges = false;
@@ -1377,6 +1521,115 @@
     return String(s).replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
+  }
+
+  // Build the full URL for a foto value.
+  // If the value starts with http:// or https://, use it as-is.
+  // Otherwise treat it as a filename inside the repo's images/ folder.
+  function fotoUrl(value) {
+    if (!value) return '';
+    const v = String(value).trim();
+    if (!v) return '';
+    if (/^https?:\/\//i.test(v)) return v;
+    // Strip leading "images/" if user already included it
+    const clean = v.replace(/^\/?images\//i, '');
+    return 'images/' + clean;
+  }
+
+  function openLightbox(url) {
+    const box = document.getElementById('lightbox');
+    const img = document.getElementById('lightboxImg');
+    img.src = url;
+    box.classList.add('active');
+  }
+  function closeLightbox() {
+    const box = document.getElementById('lightbox');
+    box.classList.remove('active');
+    document.getElementById('lightboxImg').src = '';
+  }
+
+  // Slugify a name into a safe filename base
+  function slugifyFilename(name) {
+    return String(name || 'foto')
+      .toLowerCase()
+      .normalize('NFKD').replace(/[̀-ͯ]/g, '') // strip combining accents
+      .replace(/[^a-z0-9]+/g, '-')                       // non-alphanumeric → dash
+      .replace(/^-+|-+$/g, '')                           // trim dashes
+      .replace(/-{2,}/g, '-')                            // collapse dashes
+      .slice(0, 60) || 'foto';
+  }
+
+  // Resize + compress an image File to a JPEG Blob.
+  // maxDim: longest side in pixels. quality: 0..1
+  function compressImage(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error || new Error('Kon bestand niet lezen'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Kon afbeelding niet decoderen'));
+        img.onload = () => {
+          let { width, height } = img;
+          const scale = Math.min(1, maxDim / Math.max(width, height));
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(blob => {
+            if (!blob) reject(new Error('Comprimeren mislukt'));
+            else resolve({ blob, width, height });
+          }, 'image/jpeg', quality);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function setFotoStatus(msg, isError) {
+    const el = document.getElementById('editFotoStatus');
+    if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = 'block';
+    el.textContent = msg;
+    el.style.color = isError ? '#8B3A1F' : '#5C8A2E';
+  }
+
+  async function handleFotoFilePicked(file) {
+    if (!file) return;
+    const naamInput = document.getElementById('editNaam').value.trim();
+    const merkInput = document.getElementById('editMerk').value.trim();
+    const baseName = slugifyFilename([merkInput, naamInput].filter(Boolean).join(' '));
+    const filename = baseName + '.jpg';
+    const pickBtn = document.getElementById('editFotoPick');
+    pickBtn.disabled = true;
+    setFotoStatus('⏳ Foto comprimeren...', false);
+    try {
+      const { blob, width, height } = await compressImage(file, 1200, 0.85);
+      downloadBlob(blob, filename);
+      document.getElementById('editFoto').value = filename;
+      updateFotoPreview();
+      const kb = Math.round(blob.size / 1024);
+      setFotoStatus('✅ ' + filename + ' (' + kb + ' KB, ' + width + '×' + height + ') gedownload. Upload nu naar je images/ map op GitHub.', false);
+    } catch (err) {
+      setFotoStatus('Fout: ' + (err && err.message ? err.message : err), true);
+    } finally {
+      pickBtn.disabled = false;
+      document.getElementById('editFotoFile').value = '';
+    }
   }
 
   function applyFilters() {
@@ -1448,6 +1701,7 @@
     const count = document.getElementById('itemCount');
 
     const cols = [
+      { key: 'foto', label: 'Foto', sortable: false },
       { key: 'naam', label: 'Naam' },
       { key: 'merk', label: 'Merk' },
       { key: 'prijs', label: 'Prijs', num: true },
@@ -1492,7 +1746,7 @@
     }
 
     if (rows.length === 0) {
-      body.innerHTML = '<tr><td colspan="9" class="empty-state">Geen items gevonden met deze filters</td></tr>';
+      body.innerHTML = '<tr><td colspan="10" class="empty-state">Geen items gevonden met deze filters</td></tr>';
     } else {
       body.innerHTML = rows.map(r => {
         const id = rowId(r);
@@ -1535,7 +1789,15 @@
 
         // Update prijsCell to include data-label
         const prijsCellLabeled = prijsCell.replace('<td class="num"', '<td class="num" data-label="Prijs"');
+
+        // Foto cell
+        const fotoFull = fotoUrl(r.foto);
+        const fotoCell = fotoFull
+          ? `<td data-label="Foto"><img class="foto-thumb" src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy"></td>`
+          : `<td data-label="Foto"><span class="foto-empty" title="Nog geen foto">📷</span></td>`;
+
         return `<tr class="${rowClasses.join(' ')}">
+          ${fotoCell}
           <td data-label="Naam">${escapeHtml(r.naam)}${bundleLabel}</td>
           <td data-label="Merk">${escapeHtml(r.merk)}</td>
           ${prijsCellLabeled}
@@ -1560,6 +1822,9 @@
       });
       body.querySelectorAll('button[data-edit-id]').forEach(btn => {
         btn.addEventListener('click', () => openEdit(btn.dataset.editId));
+      });
+      body.querySelectorAll('img.foto-thumb[data-foto-url]').forEach(img => {
+        img.addEventListener('click', () => openLightbox(img.dataset.fotoUrl));
       });
     }
 
@@ -1590,7 +1855,22 @@
     document.getElementById('editVerkocht').value = row.verkocht ? 'true' : 'false';
     document.getElementById('editStaat').value = row.staat;
     document.getElementById('editDoos').value = row.doos ? 'true' : 'false';
+    document.getElementById('editFoto').value = row.foto || '';
+    updateFotoPreview();
+    setFotoStatus('');
+    document.getElementById('editFotoFile').value = '';
     document.getElementById('editModal').classList.add('active');
+  }
+  function updateFotoPreview() {
+    const val = document.getElementById('editFoto').value.trim();
+    const img = document.getElementById('editFotoPreview');
+    if (val) {
+      img.src = fotoUrl(val);
+      img.style.display = 'block';
+    } else {
+      img.removeAttribute('src');
+      img.style.display = 'none';
+    }
   }
 
   function closeEdit() {
@@ -1611,6 +1891,7 @@
     row.verkocht = document.getElementById('editVerkocht').value === 'true';
     row.staat = document.getElementById('editStaat').value;
     row.doos = document.getElementById('editDoos').value === 'true';
+    row.foto = document.getElementById('editFoto').value.trim();
 
     // Write back to _raw so export preserves original column names
     if (colMap.naam) row._raw[colMap.naam] = row.naam;
@@ -1620,6 +1901,7 @@
     if (colMap.verkocht) row._raw[colMap.verkocht] = row.verkocht ? 'Ja' : 'Nee';
     if (colMap.staat) row._raw[colMap.staat] = row.staat;
     if (colMap.doos) row._raw[colMap.doos] = row.doos ? 'Ja' : 'Nee';
+    if (colMap.foto) row._raw[colMap.foto] = row.foto;
 
     // If the name changed, the rowId changed too — migrate exclude/bundle state
     const newId = rowId(row);
@@ -1820,10 +2102,31 @@
   document.getElementById('editModal').addEventListener('click', e => {
     if (e.target.id === 'editModal') closeEdit();
   });
+  document.getElementById('editFoto').addEventListener('input', updateFotoPreview);
+  document.getElementById('editFotoPreview').addEventListener('click', () => {
+    const src = document.getElementById('editFotoPreview').src;
+    if (src) openLightbox(src);
+  });
+  document.getElementById('editFotoPick').addEventListener('click', () => {
+    document.getElementById('editFotoFile').click();
+  });
+  document.getElementById('editFotoFile').addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) handleFotoFilePicked(e.target.files[0]);
+  });
+  document.getElementById('editFotoClear').addEventListener('click', () => {
+    document.getElementById('editFoto').value = '';
+    updateFotoPreview();
+    setFotoStatus('');
+  });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && document.getElementById('editModal').classList.contains('active')) {
-      closeEdit();
+    if (e.key === 'Escape') {
+      if (document.getElementById('lightbox').classList.contains('active')) { closeLightbox(); return; }
+      if (document.getElementById('editModal').classList.contains('active')) closeEdit();
     }
+  });
+  // Lightbox close (background click or X button)
+  document.getElementById('lightbox').addEventListener('click', e => {
+    if (e.target.id === 'lightbox' || e.target.id === 'lightboxClose') closeLightbox();
   });
   document.getElementById('exportBtn').addEventListener('click', exportCsv);
 
