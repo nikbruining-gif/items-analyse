@@ -1052,7 +1052,7 @@
     </div>
 
     <div class="top-bar">
-      <button class="top-toggle" id="topToggle">🏆 Top 5 lijsten tonen</button>
+      <button class="top-toggle" id="topToggle">🏆 Top 10 lijsten tonen</button>
       <button class="export-btn" id="exportBtn">💾 Download aangepaste CSV</button>
       <span class="unsaved-badge hidden" id="unsavedBadge">Niet-opgeslagen wijzigingen</span>
     </div>
@@ -1188,7 +1188,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-06-30-foto-upload';
+  const APP_VERSION = '2026-06-30-top-10';
 
   let allRows = [];
   let filteredRows = [];
@@ -2054,7 +2054,7 @@
     updateUnsavedBadge();
   }
 
-  // ===== Top 5 rankings =====
+  // ===== Top 10 rankings =====
   function rankClass(i) {
     if (i === 0) return 'top-rank gold';
     if (i === 1) return 'top-rank silver';
@@ -2073,7 +2073,7 @@
     const expensive = [...pool]
       .filter(r => effPrijs(r) > 0)
       .sort((a, b) => effPrijs(b) - effPrijs(a))
-      .slice(0, 5);
+      .slice(0, 10);
 
     renderList('topExpensive', expensive, r => ({
       name: r.naam || '(zonder naam)',
@@ -2086,7 +2086,7 @@
       .filter(r => r.verkocht)
       .map(r => ({ row: r, winst: r.waarde - effPrijs(r) }))
       .sort((a, b) => b.winst - a.winst)
-      .slice(0, 5);
+      .slice(0, 10);
 
     renderList('topProfit', profit.map(p => p.row), (r, i) => {
       const w = profit[i].winst;
@@ -2103,7 +2103,7 @@
       .filter(r => r.verkocht && effPrijs(r) > 0)
       .map(r => ({ row: r, ratio: r.waarde / effPrijs(r) }))
       .sort((a, b) => b.ratio - a.ratio)
-      .slice(0, 5);
+      .slice(0, 10);
 
     renderList('topRatio', ratio.map(p => p.row), (r, i) => {
       const x = ratio[i].ratio;
@@ -2144,12 +2144,12 @@
 
   document.getElementById('clearExclusions').addEventListener('click', clearAllExclusions);
 
-  // Top 5 toggle
+  // Top 10 toggle
   document.getElementById('topToggle').addEventListener('click', () => {
     const panel = document.getElementById('topPanel');
     const btn = document.getElementById('topToggle');
     const hidden = panel.classList.toggle('hidden');
-    btn.textContent = hidden ? '🏆 Top 5 lijsten tonen' : '🏆 Top 5 lijsten verbergen';
+    btn.textContent = hidden ? '🏆 Top 10 lijsten tonen' : '🏆 Top 10 lijsten verbergen';
     if (!hidden) renderTopLists();
   });
 
