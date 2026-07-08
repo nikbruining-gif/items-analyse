@@ -81,6 +81,13 @@
     margin: 0;
   }
   .stat-card .sub { font-size: 13px; color: #7A6B5D; margin-top: 6px; }
+  .stat-card .value-caption {
+    font-size: 13px;
+    font-weight: normal;
+    color: #7A6B5D;
+    margin-left: 8px;
+    white-space: nowrap;
+  }
   .positive { color: #5C8A2E; }
   .negative { color: #8B3A1F; }
   .neutral { color: #5C5D2A; }
@@ -1035,19 +1042,13 @@
         <p class="sub" id="statTotalItems">0 items gekocht</p>
       </div>
       <div class="stat-card">
-        <h3>📈 Totale winst/verlies</h3>
-        <p class="value" id="statProfit">€0,00</p>
-        <p class="sub" id="statProfitDetail">Op verkochte items</p>
+        <h3>📈 Totale winst/verlies verkochte items</h3>
+        <p class="value" id="statProfit"><span id="statProfitAmount">€0,00</span> <span class="value-caption" id="statProfitDetail">0 items verkocht</span></p>
+        <p class="sub" id="statInkoopVerkoop" style="font-weight: 700;">Inkoop €0,00 - Verkoop €0,00</p>
       </div>
       <div class="stat-card">
-        <h3>💵 Totale verkoopwaarde</h3>
-        <p class="value neutral" id="statTotalSold">€0,00</p>
-        <p class="sub" id="statSoldCount">0 items verkocht</p>
-      </div>
-      <div class="stat-card">
-        <h3>📦 Huidige portefeuille</h3>
-        <p class="value neutral" id="statPortfolio">€0,00</p>
-        <p class="sub" id="statPortfolioCount">0 items in bezit</p>
+        <h3>📦 Geschatte waarde huidige portefeuille</h3>
+        <p class="value neutral" id="statPortfolio"><span id="statPortfolioAmount">€0,00</span> <span class="value-caption" id="statPortfolioCount">0 items in bezit</span></p>
       </div>
     </div>
 
@@ -1188,7 +1189,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-06-30-top-10';
+  const APP_VERSION = '2026-06-30-inkoop-bold';
 
   let allRows = [];
   let filteredRows = [];
@@ -1783,15 +1784,15 @@
     itemsEl.className = 'sub' + (notes.length > 0 ? ' excluded-note' : '');
 
     const profitEl = document.getElementById('statProfit');
-    profitEl.textContent = (profit >= 0 ? '+' : '') + formatEuro(profit);
+    document.getElementById('statProfitAmount').textContent =
+      (profit >= 0 ? '+' : '') + formatEuro(profit);
     profitEl.className = 'value ' + (profit >= 0 ? 'positive' : 'negative');
     document.getElementById('statProfitDetail').textContent =
-      sold.length + ' verkocht · inkoop ' + formatEuro(totalSoldCost);
+      sold.length + ' items verkocht';
+    document.getElementById('statInkoopVerkoop').textContent =
+      'Inkoop ' + formatEuro(totalSoldCost) + ' - Verkoop ' + formatEuro(totalSold);
 
-    document.getElementById('statTotalSold').textContent = formatEuro(totalSold);
-    document.getElementById('statSoldCount').textContent = sold.length + ' items verkocht';
-
-    document.getElementById('statPortfolio').textContent = formatEuro(portfolioValue);
+    document.getElementById('statPortfolioAmount').textContent = formatEuro(portfolioValue);
     document.getElementById('statPortfolioCount').textContent = unsold.length + ' items in bezit';
 
     renderTopLists();
