@@ -8,6 +8,81 @@
 <meta http-equiv="Expires" content="0">
 <title>Items Analyse Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+  // Inline fallback CSV parser als PapaParse niet geladen kon worden (CDN down / geen internet).
+  // Ondersteunt precies de features die deze app gebruikt: header:true, skipEmptyLines,
+  // delimitersToGuess, quoted fields, en Papa.unparse voor CSV-export.
+  if (typeof Papa === 'undefined') {
+    window.Papa = {
+      parse: function (input, options) {
+        options = options || {};
+        var text = typeof input === 'string' ? input : '';
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // BOM
+        var delimiters = options.delimitersToGuess || [',', ';', '\t', '|'];
+        var firstLine = text.split(/\r?\n/)[0] || '';
+        var delim = ',', maxCount = 0;
+        for (var di = 0; di < delimiters.length; di++) {
+          var d = delimiters[di];
+          var esc = d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var count = (firstLine.match(new RegExp(esc, 'g')) || []).length;
+          if (count > maxCount) { maxCount = count; delim = d; }
+        }
+        var rows = [], cur = '', row = [], inQuote = false, i = 0;
+        while (i < text.length) {
+          var ch = text[i];
+          if (inQuote) {
+            if (ch === '"') {
+              if (text[i + 1] === '"') { cur += '"'; i += 2; continue; }
+              inQuote = false; i++;
+            } else { cur += ch; i++; }
+          } else {
+            if (ch === '"') { inQuote = true; i++; }
+            else if (ch === delim) { row.push(cur); cur = ''; i++; }
+            else if (ch === '\r') { i++; }
+            else if (ch === '\n') { row.push(cur); rows.push(row); cur = ''; row = []; i++; }
+            else { cur += ch; i++; }
+          }
+        }
+        if (cur.length > 0 || row.length > 0) { row.push(cur); rows.push(row); }
+        var filtered = rows;
+        if (options.skipEmptyLines) filtered = rows.filter(function (r) { return r.some(function (c) { return c && c.length; }); });
+        var data, fields = null;
+        if (options.header && filtered.length > 0) {
+          fields = filtered[0].map(function (f) { return (f || '').trim(); });
+          data = filtered.slice(1).map(function (r) {
+            var o = {};
+            fields.forEach(function (f, idx) { o[f] = r[idx] != null ? r[idx] : ''; });
+            return o;
+          });
+        } else { data = filtered; }
+        return { data: data, errors: [], meta: { fields: fields, delimiter: delim } };
+      },
+      unparse: function (rows, options) {
+        options = options || {};
+        var delim = options.delimiter || ',';
+        if (!Array.isArray(rows) || rows.length === 0) return '';
+        var first = rows[0];
+        var isArray = Array.isArray(first);
+        var fields = isArray ? null : Object.keys(first);
+        var esc = function (v) {
+          v = v == null ? '' : String(v);
+          if (v.indexOf(delim) >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) {
+            return '"' + v.replace(/"/g, '""') + '"';
+          }
+          return v;
+        };
+        var out = '';
+        if (fields) out += fields.map(esc).join(delim) + '\r\n';
+        for (var r of rows) {
+          var arr = fields ? fields.map(function (f) { return r[f]; }) : r;
+          out += arr.map(esc).join(delim) + '\r\n';
+        }
+        return out.replace(/\r\n$/, '');
+      }
+    };
+    console.warn('PapaParse CDN niet beschikbaar — inline fallback-parser gebruikt.');
+  }
+</script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -1060,8 +1135,12 @@
 
     <div class="top-panel hidden" id="topPanel">
       <div class="top-card">
-        <h3>💰 Duurste in aanschaf</h3>
+        <h3>💰 Hoogste aanschafprijs</h3>
         <ol class="top-list" id="topExpensive"></ol>
+      </div>
+      <div class="top-card">
+        <h3>💵 Hoogste verkoopprijs</h3>
+        <ol class="top-list" id="topSalePrice"></ol>
       </div>
       <div class="top-card">
         <h3>📈 Meeste winst</h3>
@@ -1189,7 +1268,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-06-30-inkoop-bold';
+  const APP_VERSION = '2026-06-30-top-saleprice';
 
   let allRows = [];
   let filteredRows = [];
@@ -2080,6 +2159,18 @@
       name: r.naam || '(zonder naam)',
       sub: r.merk + (r._bundleHeaderId ? ' · bundel-aandeel' : ''),
       value: formatEuro(effPrijs(r))
+    }));
+
+    // 1b. Hoogste verkoopprijs (by Waarde, sold items only)
+    const salePrice = [...pool]
+      .filter(r => r.verkocht && r.waarde > 0)
+      .sort((a, b) => b.waarde - a.waarde)
+      .slice(0, 10);
+
+    renderList('topSalePrice', salePrice, r => ({
+      name: r.naam || '(zonder naam)',
+      sub: r.merk + ' · inkoop ' + formatEuro(effPrijs(r)),
+      value: formatEuro(r.waarde)
     }));
 
     // 2. Meeste winst (sold only, by Waarde - effective Prijs)
