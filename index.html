@@ -1150,6 +1150,14 @@
         <h3>🚀 Vaakst over de kop</h3>
         <ol class="top-list" id="topRatio"></ol>
       </div>
+      <div class="top-card">
+        <h3>🏅 Beste merken op winst</h3>
+        <ol class="top-list" id="topBrandProfit"></ol>
+      </div>
+      <div class="top-card">
+        <h3>📊 Meeste items per merk</h3>
+        <ol class="top-list" id="topBrandCount"></ol>
+      </div>
     </div>
 
     <div class="filters">
@@ -1268,7 +1276,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-06-30-top-saleprice';
+  const APP_VERSION = '2026-06-30-top-brand-count';
 
   let allRows = [];
   let filteredRows = [];
@@ -2206,6 +2214,54 @@
         valueClass: x >= 1 ? 'positive' : 'negative'
       };
     });
+
+    // 4. Beste merken op winst (brand aggregation over sold items)
+    const brandAgg = new Map();
+    pool.filter(r => r.verkocht && r.merk).forEach(r => {
+      const key = r.merk.trim();
+      if (!key) return;
+      const entry = brandAgg.get(key) || { merk: key, totalWinst: 0, totalInkoop: 0, totalVerkoop: 0, count: 0 };
+      const w = r.waarde - effPrijs(r);
+      entry.totalWinst += w;
+      entry.totalInkoop += effPrijs(r);
+      entry.totalVerkoop += r.waarde;
+      entry.count += 1;
+      brandAgg.set(key, entry);
+    });
+    const brandTop = [...brandAgg.values()]
+      .sort((a, b) => b.totalWinst - a.totalWinst)
+      .slice(0, 10);
+
+    renderList('topBrandProfit', brandTop, entry => {
+      const avg = entry.count > 0 ? entry.totalWinst / entry.count : 0;
+      const mult = entry.totalInkoop > 0 ? entry.totalVerkoop / entry.totalInkoop : 0;
+      return {
+        name: entry.merk,
+        sub: entry.count + ' verk. · gem. ' + (avg >= 0 ? '+' : '') + formatEuro(avg) + (mult > 0 ? ' · ' + mult.toFixed(2).replace('.', ',') + '×' : ''),
+        value: (entry.totalWinst >= 0 ? '+' : '') + formatEuro(entry.totalWinst),
+        valueClass: entry.totalWinst >= 0 ? 'positive' : 'negative'
+      };
+    });
+
+    // 5. Meeste items per merk (brand aggregation on total count, verkocht + in bezit)
+    const brandCountAgg = new Map();
+    pool.filter(r => r.merk).forEach(r => {
+      const key = r.merk.trim();
+      if (!key) return;
+      const entry = brandCountAgg.get(key) || { merk: key, total: 0, sold: 0, owned: 0 };
+      entry.total += 1;
+      if (r.verkocht) entry.sold += 1; else entry.owned += 1;
+      brandCountAgg.set(key, entry);
+    });
+    const brandCountTop = [...brandCountAgg.values()]
+      .sort((a, b) => b.total - a.total || a.merk.localeCompare(b.merk))
+      .slice(0, 10);
+
+    renderList('topBrandCount', brandCountTop, entry => ({
+      name: entry.merk,
+      sub: entry.sold + ' verkocht · ' + entry.owned + ' in bezit',
+      value: entry.total + '×'
+    }));
   }
 
   function renderList(elId, rows, mapper) {
