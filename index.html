@@ -245,9 +245,11 @@
     background: #F5DDCF;
     color: #8B3A1F;
     border: none;
-    padding: 4px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 14px;
+    line-height: 1;
+    min-width: 30px;
     cursor: pointer;
     font-weight: 600;
     transition: all 0.15s;
@@ -385,9 +387,11 @@
     background: #E8EDD6;
     color: #5C5D2A;
     border: none;
-    padding: 4px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 14px;
+    line-height: 1;
+    min-width: 30px;
     cursor: pointer;
     font-weight: 600;
     margin-left: 4px;
@@ -414,6 +418,31 @@
     color: #5C5D2A;
     margin-top: 8px;
   }
+  .bundle-link {
+    padding: 8px 10px;
+    border-bottom: 1px solid #A5AE94;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .bundle-link:last-child { border-bottom: none; }
+  .bundle-link:hover, .bundle-link:focus {
+    background: #D6DEC0;
+    outline: none;
+  }
+  .bundle-link::before {
+    content: '📍 ';
+    opacity: 0.6;
+    font-size: 12px;
+  }
+  @keyframes rowHighlight {
+    0%   { background: #FFF4C2; }
+    100% { background: transparent; }
+  }
+  tbody tr.row-highlight {
+    animation: rowHighlight 2s ease-out;
+  }
+  tbody tr.row-highlight td { position: relative; }
   .action-cell { white-space: nowrap; }
 
   .top-toggle {
@@ -1370,7 +1399,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-08-13-top-platform';
+  const APP_VERSION = '2026-08-13-bundle-scroll';
 
   let allRows = [];
   let filteredRows = [];
@@ -1509,7 +1538,7 @@
     headers.sort((a, b) => a._idx - b._idx);
     list.innerHTML = headers.map(h => {
       if (h._bundleSize === 0) {
-        return `<div style="padding: 6px 0; border-bottom: 1px solid #A5AE94;">
+        return `<div class="bundle-link" data-scroll-idx="${h._idx}" role="button" tabindex="0">
           <strong>${escapeHtml(h.naam)}</strong> — ${formatEuro(h.prijs)}
           <em>(geen items eronder gevonden)</em>
         </div>`;
@@ -1517,12 +1546,46 @@
       const method = h._bundleDistribution === 'weighted'
         ? '<span class="bundle-note">Gewogen naar Waarde</span>'
         : '<span class="bundle-note" style="background:#B87F2B;">Gelijk verdeeld (alle Waardes = 0)</span>';
-      return `<div style="padding: 6px 0; border-bottom: 1px solid #A5AE94;">
+      return `<div class="bundle-link" data-scroll-idx="${h._idx}" role="button" tabindex="0" title="Klik om naar de bundel te scrollen">
         <strong>${escapeHtml(h.naam)}</strong> — ${formatEuro(h.prijs)}
         verdeeld over <strong>${h._bundleSize}</strong> items
         ${method}
       </div>`;
     }).join('');
+    list.querySelectorAll('.bundle-link[data-scroll-idx]').forEach(el => {
+      el.addEventListener('click', () => scrollToRow(parseInt(el.dataset.scrollIdx, 10)));
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToRow(parseInt(el.dataset.scrollIdx, 10)); }
+      });
+    });
+  }
+
+  // Scroll to the table row with the given _idx and briefly highlight it.
+  function scrollToRow(idx) {
+    const row = document.querySelector('tbody tr[data-row-idx="' + idx + '"]');
+    if (!row) {
+      // Row might be filtered out — clear filters and try again
+      const searchInp = document.getElementById('searchInput');
+      const brandSel = document.getElementById('brandFilter');
+      const soldSel = document.getElementById('soldFilter');
+      const condSel = document.getElementById('conditionFilter');
+      const boxSel = document.getElementById('boxFilter');
+      const anyActive = (searchInp && searchInp.value) || (brandSel && brandSel.value) || (soldSel && soldSel.value) ||
+                        (condSel && condSel.value) || (boxSel && boxSel.value);
+      if (anyActive && confirm('Deze bundel is niet zichtbaar door je huidige filters. Filters wissen?')) {
+        [searchInp, brandSel, soldSel, condSel, boxSel,
+         document.getElementById('inkoopPlatformFilter'),
+         document.getElementById('verkoopPlatformFilter'),
+         document.getElementById('inkoopYearFilter'),
+         document.getElementById('verkoopYearFilter')].forEach(el => { if (el) el.value = ''; });
+        applyFilters();
+        setTimeout(() => scrollToRow(idx), 50);
+      }
+      return;
+    }
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('row-highlight');
+    setTimeout(() => row.classList.remove('row-highlight'), 2000);
   }
 
   function toggleExclude(id) {
@@ -1829,11 +1892,12 @@
     excludedIds.clear();
     bundleHeaderIds.clear();
 
-    // Auto-detect bundle headers for "Marktplaats puzzles*" / "Marktplaats bundel*" / "PP bundel*"
+    // Auto-detect bundle headers for any name eindigend op "... bundel" of "... bundel N"
+    // (bv. "Marktplaats bundel 1", "PP bundel", "Ebay Bundel 2"), plus legacy "Marktplaats puzzles N".
     allRows.forEach(r => {
       const naam = r.naam.trim();
-      if (/^marktplaats\s+(puzzles?|bundel)\s*\d*/i.test(naam) ||
-          /^pp\s+bundel\s*\d*/i.test(naam)) {
+      if (/\w+\s+bundel\s*\d*\s*$/i.test(naam) ||
+          /^marktplaats\s+puzzles?\s*\d*\s*$/i.test(naam)) {
         bundleHeaderIds.add(rowId(r));
       }
     });
@@ -2135,9 +2199,11 @@
         const winstClass = winst === null ? '' : (winst >= 0 ? 'positive' : 'negative');
         const winstStr = winst === null ? '—' : (winst >= 0 ? '+' : '') + formatEuro(winst);
 
-        const excludeBtnLabel = isExcluded ? 'Terughalen' : 'Uitsluiten';
+        const excludeBtnLabel = isExcluded ? '↩' : '🚫';
+        const excludeBtnTitle = isExcluded ? 'Terughalen (weer meetellen in stats)' : 'Uitsluiten (niet meetellen in stats)';
         const excludeBtnClass = isExcluded ? 'exclude-btn active' : 'exclude-btn';
-        const bundleBtnLabel = isBundleHeader ? 'Bundel opheffen' : 'Als bundel';
+        const bundleBtnLabel = '📦';
+        const bundleBtnTitle = isBundleHeader ? 'Bundel opheffen' : 'Als bundel markeren';
         const bundleBtnClass = isBundleHeader ? 'bundle-btn active' : 'bundle-btn';
 
         // Sub-info builder for platform + month under prijs/waarde
@@ -2179,7 +2245,7 @@
           ? `<td data-label="Foto"><img class="foto-thumb" src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy"></td>`
           : `<td data-label="Foto"><span class="foto-empty" title="Nog geen foto">📷</span></td>`;
 
-        return `<tr class="${rowClasses.join(' ')}">
+        return `<tr class="${rowClasses.join(' ')}" data-row-idx="${r._idx}">
           ${fotoCell}
           <td data-label="Naam">${escapeHtml(r.naam)}${bundleLabel}</td>
           <td data-label="Merk">${escapeHtml(r.merk)}</td>
@@ -2191,8 +2257,8 @@
           <td data-label="Originele doos"><span class="badge ${r.doos ? 'badge-yes' : 'badge-no'}">${r.doos ? 'Ja' : 'Nee'}</span></td>
           <td class="action-cell" data-label="Actie">
             <button class="edit-btn" data-edit-id="${escapeHtml(id)}">Bewerk</button>
-            <button class="${excludeBtnClass}" data-exclude-id="${escapeHtml(id)}">${excludeBtnLabel}</button>
-            <button class="${bundleBtnClass}" data-bundle-id="${escapeHtml(id)}">${bundleBtnLabel}</button>
+            <button class="${excludeBtnClass}" data-exclude-id="${escapeHtml(id)}" title="${escapeHtml(excludeBtnTitle)}" aria-label="${escapeHtml(excludeBtnTitle)}">${excludeBtnLabel}</button>
+            <button class="${bundleBtnClass}" data-bundle-id="${escapeHtml(id)}" title="${escapeHtml(bundleBtnTitle)}" aria-label="${escapeHtml(bundleBtnTitle)}">${bundleBtnLabel}</button>
           </td>
         </tr>`;
       }).join('');
