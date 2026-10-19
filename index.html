@@ -658,6 +658,28 @@
     border-bottom: 1px solid #E5DCC8;
   }
   .top-list li:last-child { border-bottom: none; }
+  .top-list li.has-foto { grid-template-columns: 28px 44px 1fr auto; }
+  .top-foto {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #F3EDE0;
+    border: 1px solid #E5DCC8;
+    cursor: zoom-in;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  img.top-foto:hover { transform: scale(1.06); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+  .top-foto-empty {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-style: dashed;
+    border-color: #D9CFB9;
+    color: #C9BFA8;
+    font-size: 16px;
+    cursor: default;
+  }
   .top-rank {
     background: #F5F0DC;
     color: #5C5D2A;
@@ -2450,6 +2472,7 @@
       .slice(0, 10);
 
     renderList('topExpensive', expensive, r => ({
+      foto: r.foto || '',
       name: r.naam || '(zonder naam)',
       sub: r.merk + (r._bundleHeaderId ? ' · bundel-aandeel' : ''),
       value: formatEuro(effPrijs(r))
@@ -2462,6 +2485,7 @@
       .slice(0, 10);
 
     renderList('topSalePrice', salePrice, r => ({
+      foto: r.foto || '',
       name: r.naam || '(zonder naam)',
       sub: r.merk + ' · inkoop ' + formatEuro(effPrijs(r)),
       value: formatEuro(r.waarde)
@@ -2477,6 +2501,7 @@
     renderList('topProfit', profit.map(p => p.row), (r, i) => {
       const w = profit[i].winst;
       return {
+        foto: r.foto || '',
         name: r.naam || '(zonder naam)',
         sub: `${r.merk} · inkoop ${formatEuro(effPrijs(r))} → verkoop ${formatEuro(r.waarde)}`,
         value: (w >= 0 ? '+' : '') + formatEuro(w),
@@ -2494,6 +2519,7 @@
     renderList('topRatio', ratio.map(p => p.row), (r, i) => {
       const x = ratio[i].ratio;
       return {
+        foto: r.foto || '',
         name: r.naam || '(zonder naam)',
         sub: `${r.merk} · ${formatEuro(effPrijs(r))} → ${formatEuro(r.waarde)}`,
         value: x.toFixed(2).replace('.', ',') + '×',
@@ -2639,8 +2665,17 @@
     el.innerHTML = rows.map((r, i) => {
       const m = mapper(r, i);
       const valClass = m.valueClass ? ` ${m.valueClass}` : '';
-      return `<li>
+      // Foto-kolom alleen voor lijsten met losse items (mapper geeft 'foto' terug)
+      let fotoHtml = '';
+      if (m.foto !== undefined) {
+        const url = fotoUrl(m.foto);
+        fotoHtml = url
+          ? `<img class="top-foto" src="${escapeHtml(url)}" alt="${escapeHtml(m.name)}" data-foto-url="${escapeHtml(url)}" loading="lazy">`
+          : `<span class="top-foto top-foto-empty" title="Nog geen foto">📷</span>`;
+      }
+      return `<li${m.foto !== undefined ? ' class="has-foto"' : ''}>
         <span class="${rankClass(i)}">${i + 1}</span>
+        ${fotoHtml}
         <div>
           <div class="top-item-name">${escapeHtml(m.name)}</div>
           <div class="top-item-sub">${escapeHtml(m.sub || '')}</div>
@@ -2648,6 +2683,17 @@
         <span class="top-item-value${valClass}">${escapeHtml(m.value)}</span>
       </li>`;
     }).join('');
+    // Klik op foto opent de lightbox; ontbrekend bestand valt terug op de placeholder
+    el.querySelectorAll('img.top-foto').forEach(img => {
+      img.addEventListener('click', () => openLightbox(img.dataset.fotoUrl));
+      img.addEventListener('error', () => {
+        const ph = document.createElement('span');
+        ph.className = 'top-foto top-foto-empty';
+        ph.title = 'Foto niet gevonden';
+        ph.textContent = '📷';
+        img.replaceWith(ph);
+      }, { once: true });
+    });
   }
 
   // Wire up filter events
