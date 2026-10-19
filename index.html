@@ -2170,7 +2170,7 @@
       { key: 'winst', label: 'Winst', num: true, calc: r => r.verkocht ? r.waarde - r.prijs : null },
       { key: 'verkocht', label: 'Verkocht', bool: true },
       { key: 'staat', label: 'Staat' },
-      { key: 'doos', label: 'Originele doos', bool: true },
+      { key: 'doos', label: 'Doos', bool: true },
       { key: 'actie', label: 'Actie', sortable: false }
     ];
 
@@ -2278,7 +2278,7 @@
           <td class="num ${winstClass}" data-label="Winst"><strong>${winstStr}</strong></td>
           <td data-label="Verkocht"><span class="badge ${r.verkocht ? 'badge-yes' : 'badge-no'}">${r.verkocht ? 'Ja' : 'Nee'}</span></td>
           <td data-label="Staat">${escapeHtml(r.staat)}</td>
-          <td data-label="Originele doos"><span class="badge ${r.doos ? 'badge-yes' : 'badge-no'}">${r.doos ? 'Ja' : 'Nee'}</span></td>
+          <td data-label="Doos"><span class="badge ${r.doos ? 'badge-yes' : 'badge-no'}">${r.doos ? 'Ja' : 'Nee'}</span></td>
           <td class="action-cell" data-label="Actie">
             <button class="edit-btn" data-edit-id="${escapeHtml(id)}">Bewerk</button>
             <button class="${excludeBtnClass}" data-exclude-id="${escapeHtml(id)}" title="${escapeHtml(excludeBtnTitle)}" aria-label="${escapeHtml(excludeBtnTitle)}">${excludeBtnLabel}</button>
