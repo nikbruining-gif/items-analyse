@@ -732,6 +732,27 @@
   .trend-table-wrap th:first-child, .trend-table-wrap td:first-child { text-align: left; }
   .trend-table-wrap thead th { position: sticky; top: 0; background: #FAF6EC; }
   .trend-empty { color: #7A6B5D; padding: 30px 0; text-align: center; }
+  .trend-hint { font-size: 11px; color: #7A6B5D; margin: 0 0 4px; }
+  .trend-chart svg .trend-hit, .trend-chart svg #cumHit { cursor: pointer; }
+  .trend-table-wrap tbody tr { cursor: pointer; }
+  .trend-table-wrap tbody tr:hover td { background: #FAF6EC; }
+  .trend-table-wrap tbody tr.selected td { background: #EADFC4; font-weight: 700; }
+
+  /* Periode-filter vanuit de grafiek */
+  .period-filter {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #EADFC4; border: 1px solid #D9CFB9; color: #3D2F1F;
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px;
+  }
+  .period-filter select {
+    border: 1px solid #D9CFB9; background: white; border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: inherit;
+  }
+  .period-filter button {
+    border: none; background: white; color: #5C5D2A; font-weight: 600; font-size: 13px;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .period-filter button:hover { background: #5C5D2A; color: white; }
+  .period-filter .pf-spacer { flex: 1; }
 
   .top-panel {
     display: grid;
@@ -1369,6 +1390,7 @@
       </div>
       <div class="trend-chart-title">Per periode</div>
       <p class="trend-chart-sub">Uitgaven tellen in de maand van inkoop, verkoopopbrengst in de maand van verkoop.</p>
+      <p class="trend-hint">👆 Klik op een periode (op telefoon: tik twee keer) om de items van die periode in de lijst te zien.</p>
       <div class="trend-chart" id="trendBars"></div>
       <div class="trend-chart-title">Opgeteld sinds de eerste aankoop</div>
       <p class="trend-chart-sub">Totaal uitgegeven tegenover totaal verdiend (opgetelde verkoopprijzen), tot en met elke periode.</p>
@@ -1468,7 +1490,19 @@
       <p class="hint">Een bundel-entry (zoals "Marktplaats puzzles2") heeft de totale inkoopprijs. Die prijs wordt verdeeld over de items eronder <strong>naar rato van hun Waarde</strong>: een puzzel met een hoge Waarde krijgt een groter deel van de inkoopprijs dan een puzzel met een lage Waarde. De bundel-rij zelf telt niet mee in de statistieken. Als alle Waardes 0 zijn wordt de prijs gelijkelijk verdeeld.</p>
     </div>
 
-    <div class="table-wrapper">
+    <div class="period-filter hidden" id="periodFilter">
+      <span>📅 Periode: <strong id="periodFilterLabel"></strong></span>
+      <select id="periodFilterKind" aria-label="Welke items">
+        <option value="both">Gekocht of verkocht</option>
+        <option value="buy">Alleen gekocht</option>
+        <option value="sell">Alleen verkocht</option>
+      </select>
+      <span class="pf-spacer"></span>
+      <button type="button" id="periodFilterBack">↑ Terug naar grafiek</button>
+      <button type="button" id="periodFilterClear">✕ Wissen</button>
+    </div>
+
+    <div class="table-wrapper" id="itemsWrapper">
       <div class="table-header">
         <div class="table-header-left">
           <h2>Items</h2>
@@ -1591,7 +1625,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-05-verloop4';
+  const APP_VERSION = '2026-11-05-periodeklik';
 
   let allRows = [];
   let filteredRows = [];
@@ -1611,6 +1645,8 @@
   let viewMode = 'table';            // 'table' of 'gallery'
   let trendPeriod = 'month';         // 'month', 'quarter' of 'year'
   let trendShowTable = false;
+  let trendSel = null;               // { key, mode, kind } — periode gekozen in de grafiek
+  let trendBaseRows = [];            // gefilterde rijen zónder het periode-filter (basis voor de grafiek)
   try { if (localStorage.getItem('itemsViewMode') === 'gallery') viewMode = 'gallery'; } catch (e) {}
 
   function hardReload() {
@@ -1768,13 +1804,14 @@
       const condSel = document.getElementById('conditionFilter');
       const boxSel = document.getElementById('boxFilter');
       const anyActive = (searchInp && searchInp.value) || (brandSel && brandSel.value) || (soldSel && soldSel.value) ||
-                        (condSel && condSel.value) || (boxSel && boxSel.value);
+                        (condSel && condSel.value) || (boxSel && boxSel.value) || trendSel;
       if (anyActive && confirm('Deze bundel is niet zichtbaar door je huidige filters. Filters wissen?')) {
         [searchInp, brandSel, soldSel, condSel, boxSel,
          document.getElementById('inkoopPlatformFilter'),
          document.getElementById('verkoopPlatformFilter'),
          document.getElementById('inkoopYearFilter'),
          document.getElementById('verkoopYearFilter')].forEach(el => { if (el) el.value = ''; });
+        trendSel = null;
         applyFilters();
         setTimeout(() => scrollToRow(idx), 50);
       }
@@ -2101,7 +2138,10 @@
 
     computeBundles();
     populateFilters();
+    trendSel = null;
     filteredRows = [...allRows];
+    trendBaseRows = filteredRows;
+    updatePeriodFilterChip();
     updateStats();
     renderTable();
     renderExclusionsPanel();
@@ -2283,6 +2323,21 @@
       if (verkoopYear && yearOf(r.verkoopDatum) !== verkoopYear) return false;
       return true;
     });
+
+    // Periode gekozen in de verloop-grafiek
+    trendBaseRows = filteredRows;
+    if (trendSel) {
+      const byId = new Map(allRows.map(r => [rowId(r), r]));
+      filteredRows = filteredRows.filter(r => {
+        const ink = trendInkoopDatum(r, byId);
+        const bought = ink && trendKey(ink, trendSel.mode) === trendSel.key;
+        const sold = r.verkocht && isYmDate(r.verkoopDatum) && trendKey(r.verkoopDatum, trendSel.mode) === trendSel.key;
+        if (trendSel.kind === 'buy') return bought;
+        if (trendSel.kind === 'sell') return sold;
+        return bought || sold;
+      });
+    }
+    updatePeriodFilterChip();
 
     updateStats();
     renderTable();
@@ -2519,10 +2574,39 @@
     return ticks;
   }
 
+  function isYmDate(d) { return /^\d{4}-\d{2}$/.test(d || ''); }
+  // Inkoopdatum van een item; items uit een bundel zonder eigen datum krijgen die van de bundel
+  function trendInkoopDatum(r, byId) {
+    if (isYmDate(r.inkoopDatum)) return r.inkoopDatum;
+    const h = r._bundleHeaderId && byId.get(r._bundleHeaderId);
+    return h && isYmDate(h.inkoopDatum) ? h.inkoopDatum : '';
+  }
+
+  function selectTrendPeriod(key) {
+    if (trendSel && trendSel.key === key && trendSel.mode === trendPeriod) {
+      trendSel = null;
+      applyFilters();
+      return;
+    }
+    trendSel = { key, mode: trendPeriod, kind: trendSel ? trendSel.kind : 'both' };
+    applyFilters();
+    const chip = document.getElementById('periodFilter');
+    if (chip) chip.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updatePeriodFilterChip() {
+    const chip = document.getElementById('periodFilter');
+    if (!chip) return;
+    chip.classList.toggle('hidden', !trendSel);
+    if (!trendSel) return;
+    document.getElementById('periodFilterLabel').textContent = trendLabel(trendSel.key, trendSel.mode, false);
+    document.getElementById('periodFilterKind').value = trendSel.kind;
+  }
+
   function buildTrendData() {
-    const isYm = d => /^\d{4}-\d{2}$/.test(d || '');
+    const isYm = isYmDate;
     const byId = new Map(allRows.map(r => [rowId(r), r]));
-    const rows = filteredRows.filter(r => !excludedIds.has(rowId(r)) && !r._isBundleHeader);
+    const rows = trendBaseRows.filter(r => !excludedIds.has(rowId(r)) && !r._isBundleHeader);
     const effPrijs = r => (r._effectivePrijs !== undefined ? r._effectivePrijs : r.prijs);
     const buys = [], sales = [];
     let noBuyDate = 0, noSaleDate = 0;
@@ -2568,7 +2652,8 @@
       <div class="t-row"><span style="padding-left:15px">Winst</span><span>${p.winst >= 0 ? '+' : ''}${formatEuro(p.winst)}</span></div>
       <div class="t-muted">${p.gekocht} gekocht · ${p.verkocht} verkocht</div>
       <div class="t-muted">Totaal tot nu: ${formatEuro(p.cumUitgaven)} uitgegeven, ${formatEuro(p.cumOmzet)} verdiend</div>
-      <div class="t-muted">(waarvan ${p.cumWinst >= 0 ? '+' : ''}${formatEuro(p.cumWinst)} winst)</div>`;
+      <div class="t-muted">(waarvan ${p.cumWinst >= 0 ? '+' : ''}${formatEuro(p.cumWinst)} winst)</div>
+      <div class="t-muted" style="color:#5C5D2A;font-weight:600;">${trendSel && trendSel.key === p.key ? '👆 Klik om het filter te wissen' : '👆 Klik om deze items te tonen'}</div>`;
   }
 
   function placeTip(tip, wrap, x, y) {
@@ -2617,6 +2702,7 @@
     // Twee staven per periode dicht tegen elkaar, met ruimte tussen de periodes
     const bw = Math.max(2, Math.min(24, (band * 0.62 - 1) / 2));
     const y0 = ys(0);
+    const selIdx = trendSel && trendSel.mode === trendPeriod ? periods.findIndex(p => p.key === trendSel.key) : -1;
     let bars = '', hits = '', shade = '';
     periods.forEach((p, i) => {
       const cx = xc(i);
@@ -2635,6 +2721,7 @@
         ${shade}
         ${axisSvg(ticks, ys, W, ml, mr)}
         <rect id="trendBarsHover" x="0" y="${mt}" width="${band}" height="${H - mt - mb}" fill="#EDE3CC" opacity="0" />
+        ${selIdx >= 0 ? `<rect x="${ml + band * selIdx}" y="${mt}" width="${band}" height="${y0 - mt}" fill="#EADFC4"/><rect x="${ml + band * selIdx}" y="${y0 + 1}" width="${band}" height="3" rx="1.5" fill="#5C5D2A"/>` : ''}
         ${bars}${xLabelsSvg(periods, xc, H, mb, W, ml, mr)}${hits}
       </svg><div class="trend-tip"></div>`;
     const tip = el.querySelector('.trend-tip'), hl = el.querySelector('#trendBarsHover');
@@ -2648,20 +2735,32 @@
         placeTip(tip, el, e.clientX - box.left, e.clientY - box.top);
       });
     });
-    svg.addEventListener('mouseleave', () => { tip.style.display = 'none'; hl.setAttribute('opacity', '0'); });
-    bindTouch(el, svg, i => { hl.setAttribute('x', ml + band * i); hl.setAttribute('opacity', '1'); return periods[i]; }, x => Math.floor((x - ml) / band), periods.length);
+    svg.addEventListener('mouseleave', () => {
+      if (Date.now() - (el._touchAt || 0) < 1500) return; // nagebootste muis-events na een tik negeren
+      tip.style.display = 'none'; hl.setAttribute('opacity', '0');
+    });
+    bindSelect(el, svg, i => { hl.setAttribute('x', ml + band * i); hl.setAttribute('opacity', '1'); return periods[i]; }, x => Math.floor((x - ml) / band), periods);
   }
 
-  function bindTouch(el, svg, onIndex, indexOf, n) {
-    svg.addEventListener('touchstart', e => {
+  // Klik (muis) kiest direct een periode; op touch toont de eerste tik de tooltip en kiest de tweede tik
+  function bindSelect(el, svg, onIndex, indexOf, periods) {
+    const n = periods.length;
+    svg.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') el._touchAt = Date.now(); });
+    svg.addEventListener('pointerup', e => {
       const box = el.getBoundingClientRect();
-      const t = e.touches[0];
-      const sx = (t.clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
-      const i = Math.max(0, Math.min(n - 1, indexOf(sx)));
+      const sx = (e.clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+      const i = indexOf(sx);
+      if (i < 0 || i >= n) return;
+      if (e.pointerType === 'mouse' || el._tipIdx === i) {
+        el._tipIdx = null;
+        selectTrendPeriod(periods[i].key);
+        return;
+      }
+      el._tipIdx = i;
       const tip = el.querySelector('.trend-tip');
       tip.innerHTML = trendTipHtml(onIndex(i));
-      placeTip(tip, el, t.clientX - box.left, t.clientY - box.top);
-    }, { passive: true });
+      placeTip(tip, el, e.clientX - box.left, e.clientY - box.top);
+    });
   }
 
   function renderTrendCum(el, periods) {
@@ -2678,6 +2777,7 @@
     const xc = i => n > 1 ? ml + step * i : ml + (W - ml - mr) / 2;
     const line = key => periods.map((p, i) => (i ? 'L' : 'M') + xc(i).toFixed(1) + ',' + ys(p[key]).toFixed(1)).join('');
     const lastP = periods[n - 1];
+    const cumSel = trendSel && trendSel.mode === trendPeriod ? periods.findIndex(p => p.key === trendSel.key) : -1;
     let ly1 = ys(lastP.cumUitgaven), ly2 = ys(lastP.cumOmzet);
     if (Math.abs(ly1 - ly2) < 36) { if (ly1 <= ly2) { ly2 = ly1 + 36; } else { ly1 = ly2 + 36; } }
     const lx = xc(n - 1) + 10;
@@ -2690,6 +2790,7 @@
     })();
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Opgeteld uitgegeven en verdiend">
         ${axisSvg(ticks, ys, W, ml, mr)}
+        ${cumSel >= 0 ? `<line x1="${xc(cumSel)}" x2="${xc(cumSel)}" y1="${mt}" y2="${H - mb}" stroke="#5C5D2A" stroke-width="1.5" stroke-dasharray="4 3"/>` : ''}
         <line id="cumCross" x1="0" x2="0" y1="${mt}" y2="${H - mb}" stroke="#BFB39A" stroke-width="1" opacity="0"/>
         <path d="${line('cumUitgaven')}" fill="none" stroke="${TREND_SPEND}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         <path d="${line('cumOmzet')}" fill="none" stroke="${TREND_PROFIT}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
@@ -2720,10 +2821,11 @@
       placeTip(tip, el, xc(i) * (box.width / W), e.clientY - box.top);
     });
     svg.addEventListener('mouseleave', () => {
+      if (Date.now() - (el._touchAt || 0) < 1500) return;
       tip.style.display = 'none';
       [cross, d1, d2].forEach(x => x.setAttribute('opacity', '0'));
     });
-    bindTouch(el, svg, show, idxOf, n);
+    bindSelect(el, svg, show, sx => Math.max(0, Math.min(n - 1, idxOf(sx))), periods);
   }
 
   function renderTrend() {
@@ -2756,9 +2858,10 @@
 
     if (trendShowTable) {
       tableWrap.innerHTML = `<table><thead><tr><th>Periode</th><th>Uitgaven</th><th>Verkoopopbrengst</th><th>Winst</th><th>Gekocht</th><th>Verkocht</th><th>Totaal uitgegeven</th><th>Totaal verdiend</th><th>Totaal winst</th></tr></thead><tbody>` +
-        periods.map(p => `<tr><td>${escapeHtml(lbl(p.key))}</td><td>${formatEuro(p.uitgaven)}</td><td>${formatEuro(p.omzet)}</td><td class="${p.winst > 0 ? 'positive' : p.winst < 0 ? 'negative' : ''}">${p.winst > 0 ? '+' : ''}${formatEuro(p.winst)}</td><td>${p.gekocht}</td><td>${p.verkocht}</td><td>${formatEuro(p.cumUitgaven)}</td><td>${formatEuro(p.cumOmzet)}</td><td>${p.cumWinst > 0 ? '+' : ''}${formatEuro(p.cumWinst)}</td></tr>`).join('') +
+        periods.map(p => `<tr data-key="${escapeHtml(p.key)}" class="${trendSel && trendSel.mode === trendPeriod && trendSel.key === p.key ? 'selected' : ''}"><td>${escapeHtml(lbl(p.key))}</td><td>${formatEuro(p.uitgaven)}</td><td>${formatEuro(p.omzet)}</td><td class="${p.winst > 0 ? 'positive' : p.winst < 0 ? 'negative' : ''}">${p.winst > 0 ? '+' : ''}${formatEuro(p.winst)}</td><td>${p.gekocht}</td><td>${p.verkocht}</td><td>${formatEuro(p.cumUitgaven)}</td><td>${formatEuro(p.cumOmzet)}</td><td>${p.cumWinst > 0 ? '+' : ''}${formatEuro(p.cumWinst)}</td></tr>`).join('') +
         '</tbody></table>';
     }
+    tableWrap.querySelectorAll('tr[data-key]').forEach(tr => tr.addEventListener('click', () => selectTrendPeriod(tr.dataset.key)));
     tableWrap.classList.toggle('hidden', !trendShowTable);
     document.getElementById('trendTableBtn').textContent = trendShowTable ? 'Tabel verbergen' : 'Tabel tonen';
 
@@ -3264,6 +3367,17 @@
 
   document.getElementById('clearExclusions').addEventListener('click', clearAllExclusions);
 
+  // Periode-filter (vanuit de grafiek)
+  document.getElementById('periodFilterKind').addEventListener('change', e => {
+    if (!trendSel) return;
+    trendSel.kind = e.target.value;
+    applyFilters();
+  });
+  document.getElementById('periodFilterClear').addEventListener('click', () => { trendSel = null; applyFilters(); });
+  document.getElementById('periodFilterBack').addEventListener('click', () => {
+    document.getElementById('trendPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
   // Verloop-grafiek
   document.getElementById('trendToggle').addEventListener('click', () => {
     const panel = document.getElementById('trendPanel');
@@ -3307,7 +3421,9 @@
         platformMode = btn.dataset.mode;
       }
       group.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
-      if (list === 'trend') renderTrend(); else renderTopLists();
+      if (list === 'trend') {
+        if (trendSel) { trendSel = null; applyFilters(); } else renderTrend();
+      } else renderTopLists();
     });
   });
 
