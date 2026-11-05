@@ -208,6 +208,64 @@
   }
   .table-header h2 { margin: 0; font-size: 18px; }
   .table-header .count { color: #7A6B5D; font-size: 14px; }
+  .table-header-left { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .table-header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .view-toggle { display: inline-flex; background: #F3EDE0; border: 1px solid #E5DCC8; border-radius: 8px; padding: 3px; }
+  .view-toggle button {
+    background: transparent; border: none; color: #7A6B5D; font-weight: 600; font-size: 13px;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
+  .view-toggle button.active { background: white; color: #5C5D2A; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .gallery-sort {
+    border: 1px solid #E5DCC8; background: white; color: #3D2F1F; border-radius: 8px;
+    padding: 7px 10px; font-size: 13px;
+  }
+
+  /* Galerijweergave */
+  .gallery-scroll { max-height: 900px; overflow-y: auto; padding: 20px; }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 18px;
+  }
+  .gallery-card {
+    background: white; border: 1px solid #E5DCC8; border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .gallery-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+  .gallery-card.excluded { opacity: 0.45; }
+  .gallery-card.bundle-header { border-color: #5C5D2A; border-width: 2px; }
+  .gallery-photo {
+    position: relative; aspect-ratio: 1 / 1; background: #F3EDE0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .gallery-photo img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; display: block; }
+  .gallery-photo .gallery-photo-empty { font-size: 42px; color: #C9BFA8; }
+  .gallery-labels { position: absolute; top: 8px; left: 8px; right: 46px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
+  .gallery-label {
+    font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px;
+    background: rgba(255,255,255,0.92); color: #5C5D2A; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  }
+  .gallery-label.sold { background: #5C8A2E; color: white; }
+  .gallery-label.bundle { background: #5C5D2A; color: white; }
+  .gallery-label.excl { background: #8B3A1F; color: white; }
+  .gallery-edit {
+    position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,0.92); cursor: pointer; font-size: 15px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center;
+  }
+  .gallery-edit:hover { background: #D88B6C; }
+  .gallery-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .gallery-name { font-weight: 700; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+  .gallery-brand { color: #7A6B5D; font-size: 12px; }
+  .gallery-prices {
+    margin-top: auto; padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+    font-size: 12px; border-top: 1px dashed #E5DCC8;
+  }
+  .gallery-prices .lbl { color: #7A6B5D; display: block; font-size: 11px; }
+  .gallery-prices .amt { font-weight: 700; white-space: nowrap; }
+  .gallery-profit { grid-column: 1 / -1; }
+  .gallery-empty { text-align: center; color: #7A6B5D; padding: 40px 20px; }
   .table-scroll { overflow-x: auto; max-height: 600px; overflow-y: auto; }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E5DCC8; }
@@ -1006,6 +1064,12 @@
     .table-wrapper { border-radius: 10px; }
     .table-header { padding: 14px 16px; flex-direction: column; align-items: flex-start; gap: 4px; }
     .table-header h2 { font-size: 16px; }
+    .table-header-right { width: 100%; }
+    .gallery-scroll { max-height: none; padding: 10px; }
+    .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .gallery-body { padding: 10px; }
+    .gallery-name { font-size: 13px; }
+    .gallery-prices { grid-template-columns: 1fr; }
     .table-scroll { overflow: visible; max-height: none; padding: 8px; }
 
     table, thead, tbody, tr, td { display: block; width: 100%; }
@@ -1322,10 +1386,30 @@
 
     <div class="table-wrapper">
       <div class="table-header">
-        <h2>Items</h2>
-        <span class="count" id="itemCount">0 items</span>
+        <div class="table-header-left">
+          <h2>Items</h2>
+          <span class="count" id="itemCount">0 items</span>
+        </div>
+        <div class="table-header-right">
+          <select class="gallery-sort hidden" id="gallerySort" aria-label="Sorteren">
+            <option value="">Sorteren: CSV-volgorde</option>
+            <option value="naam:1">Naam (A-Z)</option>
+            <option value="merk:1">Merk (A-Z)</option>
+            <option value="prijs:-1">Prijs (hoog-laag)</option>
+            <option value="prijs:1">Prijs (laag-hoog)</option>
+            <option value="waarde:-1">Waarde (hoog-laag)</option>
+            <option value="winst:-1">Winst (hoog-laag)</option>
+          </select>
+          <div class="view-toggle" role="group" aria-label="Weergave">
+            <button type="button" id="viewTableBtn" class="active">📋 Tabel</button>
+            <button type="button" id="viewGalleryBtn">🖼️ Galerij</button>
+          </div>
+        </div>
       </div>
-      <div class="table-scroll">
+      <div class="gallery-scroll hidden" id="galleryScroll">
+        <div class="gallery-grid" id="galleryGrid"></div>
+      </div>
+      <div class="table-scroll" id="tableScroll">
         <table id="itemsTable">
           <thead>
             <tr id="tableHead"></tr>
@@ -1423,7 +1507,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-08-13-bundle-scroll';
+  const APP_VERSION = '2026-11-05-galerij';
 
   let allRows = [];
   let filteredRows = [];
@@ -1440,6 +1524,8 @@
   let periodModeSpending = 'month';  // 'month' or 'year'
   let periodModeIncome = 'month';
   let platformMode = 'inkoop';       // 'inkoop' or 'verkoop'
+  let viewMode = 'table';            // 'table' of 'gallery'
+  try { if (localStorage.getItem('itemsViewMode') === 'gallery') viewMode = 'gallery'; } catch (e) {}
 
   function hardReload() {
     const url = new URL(location.href);
@@ -1586,6 +1672,7 @@
 
   // Scroll to the table row with the given _idx and briefly highlight it.
   function scrollToRow(idx) {
+    if (viewMode === 'gallery') setViewMode('table');
     const row = document.querySelector('tbody tr[data-row-idx="' + idx + '"]');
     if (!row) {
       // Row might be filtered out — clear filters and try again
@@ -2309,6 +2396,97 @@
     if (bundleCount > 0) extras.push(bundleCount + ' bundel-header(s)');
     count.textContent = activeCount + ' item' + (activeCount === 1 ? '' : 's') +
       (extras.length > 0 ? ' (' + extras.join(', ') + ')' : '');
+
+    if (viewMode === 'gallery') renderGallery(rows);
+  }
+
+  // ===== Galerijweergave =====
+  function setViewMode(mode) {
+    viewMode = mode === 'gallery' ? 'gallery' : 'table';
+    try { localStorage.setItem('itemsViewMode', viewMode); } catch (e) {}
+    const isGallery = viewMode === 'gallery';
+    document.getElementById('viewTableBtn').classList.toggle('active', !isGallery);
+    document.getElementById('viewGalleryBtn').classList.toggle('active', isGallery);
+    document.getElementById('tableScroll').classList.toggle('hidden', isGallery);
+    document.getElementById('galleryScroll').classList.toggle('hidden', !isGallery);
+    document.getElementById('gallerySort').classList.toggle('hidden', !isGallery);
+    syncGallerySort();
+    renderTable();
+  }
+
+  function syncGallerySort() {
+    const sel = document.getElementById('gallerySort');
+    const val = sortCol ? sortCol + ':' + sortDir : '';
+    sel.value = [...sel.options].some(o => o.value === val) ? val : '';
+  }
+
+  function renderGallery(rows) {
+    const grid = document.getElementById('galleryGrid');
+    if (rows.length === 0) {
+      grid.innerHTML = '<div class="gallery-empty" style="grid-column:1/-1;">Geen items gevonden met deze filters</div>';
+      return;
+    }
+    grid.innerHTML = rows.map(r => {
+      const id = rowId(r);
+      const isExcluded = excludedIds.has(id);
+      const isBundleHeader = r._isBundleHeader;
+      const isBundleItem = !!r._bundleHeaderId;
+      const effPrijs = r._effectivePrijs !== undefined ? r._effectivePrijs : r.prijs;
+      const winstPrijs = isBundleHeader ? r.prijs : effPrijs;
+      const winst = r.verkocht ? r.waarde - winstPrijs : null;
+
+      const labels = [];
+      if (r.verkocht) labels.push('<span class="gallery-label sold">Verkocht</span>');
+      if (r.doos) labels.push('<span class="gallery-label">Met doos</span>');
+      if (isBundleHeader) labels.push(`<span class="gallery-label bundle">Bundel · ${r._bundleSize}</span>`);
+      else if (isBundleItem) labels.push('<span class="gallery-label">Uit bundel</span>');
+      if (isExcluded) labels.push('<span class="gallery-label excl">Uitgesloten</span>');
+
+      const fotoFull = fotoUrl(r.foto);
+      const fotoHtml = fotoFull
+        ? `<img src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy">`
+        : '<span class="gallery-photo-empty" title="Nog geen foto">📷</span>';
+
+      const prijsLbl = isBundleHeader ? 'Prijs (totaal)' : (isBundleItem ? 'Prijs (aandeel)' : 'Prijs');
+      const waardeLbl = r.verkocht ? 'Verkocht voor' : 'Waarde';
+      const profitHtml = winst === null ? '' :
+        `<div class="gallery-profit"><span class="lbl">Winst</span><span class="amt ${winst >= 0 ? 'positive' : 'negative'}">${winst >= 0 ? '+' : ''}${formatEuro(winst)}</span></div>`;
+
+      const classes = ['gallery-card'];
+      if (isExcluded) classes.push('excluded');
+      if (isBundleHeader) classes.push('bundle-header');
+
+      return `<div class="${classes.join(' ')}">
+        <div class="gallery-photo">
+          ${fotoHtml}
+          <div class="gallery-labels">${labels.join('')}</div>
+          <button type="button" class="gallery-edit" data-edit-id="${escapeHtml(id)}" title="Bewerken" aria-label="Bewerken">✏️</button>
+        </div>
+        <div class="gallery-body">
+          <div class="gallery-name">${escapeHtml(r.naam)}</div>
+          <div class="gallery-brand">${escapeHtml(r.merk)}${r.staat ? ' · ' + escapeHtml(r.staat) : ''}</div>
+          <div class="gallery-prices">
+            <div><span class="lbl">${prijsLbl}</span><span class="amt">${formatEuro(isBundleHeader ? r.prijs : effPrijs)}</span></div>
+            <div><span class="lbl">${waardeLbl}</span><span class="amt">${formatEuro(r.waarde)}</span></div>
+            ${profitHtml}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('button[data-edit-id]').forEach(btn => {
+      btn.addEventListener('click', () => openEdit(btn.dataset.editId));
+    });
+    grid.querySelectorAll('.gallery-photo img[data-foto-url]').forEach(img => {
+      img.addEventListener('click', () => openLightbox(img.dataset.fotoUrl));
+      img.addEventListener('error', () => {
+        const ph = document.createElement('span');
+        ph.className = 'gallery-photo-empty';
+        ph.title = 'Foto niet gevonden';
+        ph.textContent = '📷';
+        img.replaceWith(ph);
+      }, { once: true });
+    });
   }
 
   // ===== Edit modal =====
@@ -2704,6 +2882,17 @@
     document.getElementById(id).addEventListener('input', applyFilters);
     document.getElementById(id).addEventListener('change', applyFilters);
   });
+
+  // Weergave: tabel of galerij
+  document.getElementById('viewTableBtn').addEventListener('click', () => setViewMode('table'));
+  document.getElementById('viewGalleryBtn').addEventListener('click', () => setViewMode('gallery'));
+  document.getElementById('gallerySort').addEventListener('change', e => {
+    const v = e.target.value;
+    if (!v) { sortCol = null; sortDir = 1; }
+    else { const [c, d] = v.split(':'); sortCol = c; sortDir = Number(d); }
+    renderTable();
+  });
+  if (viewMode === 'gallery') setViewMode('gallery');
 
   document.getElementById('clearExclusions').addEventListener('click', clearAllExclusions);
 
