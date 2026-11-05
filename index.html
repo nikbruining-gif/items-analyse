@@ -725,6 +725,15 @@
   .trend-tip .t-row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
   .trend-tip .t-row i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
   .trend-tip .t-muted { color: #7A6B5D; margin-top: 4px; font-size: 11px; }
+  .trend-tip.touch { pointer-events: auto; padding-right: 34px; }
+  .trend-tip-close {
+    position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border: none; border-radius: 50%;
+    background: #F3EDE0; color: #3D2F1F; font-size: 14px; line-height: 1; cursor: pointer; font-family: inherit;
+  }
+  .trend-tip-show {
+    display: block; width: 100%; margin-top: 8px; border: none; border-radius: 6px; background: #5C5D2A; color: white;
+    font-weight: 600; font-size: 12px; padding: 7px 10px; cursor: pointer; font-family: inherit;
+  }
   .trend-note { font-size: 11px; color: #7A6B5D; margin-top: 10px; }
   .trend-table-wrap { max-height: 360px; overflow: auto; margin-top: 14px; border: 1px solid #E5DCC8; border-radius: 8px; }
   .trend-table-wrap table { font-size: 13px; }
@@ -1390,7 +1399,7 @@
       </div>
       <div class="trend-chart-title">Per periode</div>
       <p class="trend-chart-sub">Uitgaven tellen in de maand van inkoop, verkoopopbrengst in de maand van verkoop.</p>
-      <p class="trend-hint">👆 Klik op een periode (op telefoon: tik twee keer) om de items van die periode in de lijst te zien.</p>
+      <p class="trend-hint">👆 Klik op een periode om de items van die periode in de lijst te zien. Op je telefoon: tik op een periode en kies "Toon deze items"; ✕ of ergens anders tikken sluit de details.</p>
       <div class="trend-chart" id="trendBars"></div>
       <div class="trend-chart-title">Opgeteld sinds de eerste aankoop</div>
       <p class="trend-chart-sub">Totaal uitgegeven tegenover totaal verdiend (opgetelde verkoopprijzen), tot en met elke periode.</p>
@@ -1625,7 +1634,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-05-periodeklik';
+  const APP_VERSION = '2026-11-05-tooltipsluiten';
 
   let allRows = [];
   let filteredRows = [];
@@ -2645,7 +2654,7 @@
     return { periods, first, noBuyDate, noSaleDate };
   }
 
-  function trendTipHtml(p) {
+  function trendTipHtml(p, isTouch) {
     return `<div class="t-head">${escapeHtml(trendLabel(p.key, trendPeriod, false))}</div>
       <div class="t-row"><span><i style="background:${TREND_SPEND}"></i>Uitgaven</span><strong>${formatEuro(p.uitgaven)}</strong></div>
       <div class="t-row"><span><i style="background:${TREND_PROFIT}"></i>Verkoopopbrengst</span><strong>${formatEuro(p.omzet)}</strong></div>
@@ -2653,7 +2662,9 @@
       <div class="t-muted">${p.gekocht} gekocht · ${p.verkocht} verkocht</div>
       <div class="t-muted">Totaal tot nu: ${formatEuro(p.cumUitgaven)} uitgegeven, ${formatEuro(p.cumOmzet)} verdiend</div>
       <div class="t-muted">(waarvan ${p.cumWinst >= 0 ? '+' : ''}${formatEuro(p.cumWinst)} winst)</div>
-      <div class="t-muted" style="color:#5C5D2A;font-weight:600;">${trendSel && trendSel.key === p.key ? '👆 Klik om het filter te wissen' : '👆 Klik om deze items te tonen'}</div>`;
+      ${isTouch
+        ? `<button type="button" class="trend-tip-show">${trendSel && trendSel.key === p.key ? 'Filter wissen' : 'Toon deze items ›'}</button>`
+        : `<div class="t-muted" style="color:#5C5D2A;font-weight:600;">${trendSel && trendSel.key === p.key ? '👆 Klik om het filter te wissen' : '👆 Klik om deze items te tonen'}</div>`}`;
   }
 
   function placeTip(tip, wrap, x, y) {
@@ -2739,12 +2750,25 @@
       if (Date.now() - (el._touchAt || 0) < 1500) return; // nagebootste muis-events na een tik negeren
       tip.style.display = 'none'; hl.setAttribute('opacity', '0');
     });
-    bindSelect(el, svg, i => { hl.setAttribute('x', ml + band * i); hl.setAttribute('opacity', '1'); return periods[i]; }, x => Math.floor((x - ml) / band), periods);
+    bindSelect(el, svg, i => { hl.setAttribute('x', ml + band * i); hl.setAttribute('opacity', '1'); return periods[i]; }, x => Math.floor((x - ml) / band), periods,
+      () => hl.setAttribute('opacity', '0'));
   }
 
   // Klik (muis) kiest direct een periode; op touch toont de eerste tik de tooltip en kiest de tweede tik
-  function bindSelect(el, svg, onIndex, indexOf, periods) {
+  // Alle open tooltips in de verloop-grafieken sluiten
+  function hideTrendTips() {
+    document.querySelectorAll('.trend-chart').forEach(c => { if (c._hideTip) c._hideTip(); });
+  }
+
+  function bindSelect(el, svg, onIndex, indexOf, periods, onHide) {
     const n = periods.length;
+    const tipEl = el.querySelector('.trend-tip');
+    el._hideTip = () => {
+      tipEl.style.display = 'none';
+      tipEl.classList.remove('touch');
+      el._tipIdx = null;
+      if (onHide) onHide();
+    };
     svg.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') el._touchAt = Date.now(); });
     svg.addEventListener('pointerup', e => {
       const box = el.getBoundingClientRect();
@@ -2756,12 +2780,27 @@
         selectTrendPeriod(periods[i].key);
         return;
       }
+      hideTrendTips(); // maar één tooltip tegelijk
       el._tipIdx = i;
-      const tip = el.querySelector('.trend-tip');
-      tip.innerHTML = trendTipHtml(onIndex(i));
+      const tip = tipEl;
+      tip.classList.add('touch');
+      tip.innerHTML = '<button type="button" class="trend-tip-close" aria-label="Sluiten">✕</button>' + trendTipHtml(onIndex(i), true);
+      tip.querySelector('.trend-tip-close').addEventListener('click', ev => { ev.stopPropagation(); el._hideTip(); });
+      tip.querySelector('.trend-tip-show').addEventListener('click', ev => {
+        ev.stopPropagation();
+        el._hideTip();
+        selectTrendPeriod(periods[i].key);
+      });
       placeTip(tip, el, e.clientX - box.left, e.clientY - box.top);
     });
   }
+
+  // Op touch: tik ergens buiten de grafiek of de tooltip sluit de tooltip
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    if (e.target.closest && (e.target.closest('.trend-chart svg') || e.target.closest('.trend-tip'))) return;
+    hideTrendTips();
+  }, true);
 
   function renderTrendCum(el, periods) {
     const W = Math.max(300, el.clientWidth), H = 230, ml = 62, mr = 112, mt = 14, mb = 30;
@@ -2825,7 +2864,8 @@
       tip.style.display = 'none';
       [cross, d1, d2].forEach(x => x.setAttribute('opacity', '0'));
     });
-    bindSelect(el, svg, show, sx => Math.max(0, Math.min(n - 1, idxOf(sx))), periods);
+    bindSelect(el, svg, show, sx => Math.max(0, Math.min(n - 1, idxOf(sx))), periods,
+      () => [cross, d1, d2].forEach(x => x.setAttribute('opacity', '0')));
   }
 
   function renderTrend() {
