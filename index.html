@@ -685,6 +685,54 @@
   .deal-row a.tdh { background: #BF8A2E; color: white; }
   .deal-row a.tdh:hover { background: #9C6F22; }
 
+  /* ===== Verloop-grafiek ===== */
+  .trend-panel {
+    background: white; border-radius: 12px; padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 30px;
+  }
+  .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .trend-head h3 { margin: 0; font-size: 16px; }
+  .trend-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .trend-controls .period-toggle { margin-left: 0; }
+  .trend-table-btn {
+    background: transparent; border: 1px solid #E5DCC8; color: #7A6B5D; border-radius: 6px;
+    padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .trend-table-btn:hover { background: #F3EDE0; }
+  .trend-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;
+    margin: 14px 0 6px;
+  }
+  .trend-fact { background: #FAF6EC; border-radius: 8px; padding: 10px 12px; }
+  .trend-fact .lbl { display: block; font-size: 11px; color: #7A6B5D; margin-bottom: 2px; }
+  .trend-fact .val { font-weight: 700; font-size: 15px; white-space: nowrap; }
+  .trend-fact .sub { display: block; font-size: 11px; color: #7A6B5D; margin-top: 2px; }
+  .trend-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #3D2F1F; margin: 12px 0 4px; }
+  .trend-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .trend-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+  .trend-legend i.line { height: 3px; border-radius: 2px; width: 16px; }
+  .trend-chart-title { font-size: 13px; font-weight: 700; color: #3D2F1F; margin: 18px 0 2px; }
+  .trend-chart-sub { font-size: 12px; color: #7A6B5D; margin: 0 0 4px; }
+  .trend-chart { position: relative; width: 100%; }
+  .trend-chart svg { display: block; width: 100%; overflow: visible; }
+  .trend-chart svg text { font-family: inherit; }
+  .trend-tip {
+    position: absolute; pointer-events: none; background: white; border: 1px solid #E5DCC8;
+    border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); padding: 8px 10px;
+    font-size: 12px; color: #3D2F1F; min-width: 170px; z-index: 5; display: none;
+  }
+  .trend-tip .t-head { font-weight: 700; margin-bottom: 4px; }
+  .trend-tip .t-row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
+  .trend-tip .t-row i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+  .trend-tip .t-muted { color: #7A6B5D; margin-top: 4px; font-size: 11px; }
+  .trend-note { font-size: 11px; color: #7A6B5D; margin-top: 10px; }
+  .trend-table-wrap { max-height: 360px; overflow: auto; margin-top: 14px; border: 1px solid #E5DCC8; border-radius: 8px; }
+  .trend-table-wrap table { font-size: 13px; }
+  .trend-table-wrap th, .trend-table-wrap td { padding: 6px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid #F0E9DA; }
+  .trend-table-wrap th:first-child, .trend-table-wrap td:first-child { text-align: left; }
+  .trend-table-wrap thead th { position: sticky; top: 0; background: #FAF6EC; }
+  .trend-empty { color: #7A6B5D; padding: 30px 0; text-align: center; }
+
   .top-panel {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -1044,6 +1092,14 @@
     .unsaved-badge { text-align: center; }
 
     .top-panel { grid-template-columns: 1fr; gap: 12px; }
+    .trend-panel { padding: 16px 14px; }
+    .trend-summary { grid-template-columns: 1fr 1fr; }
+    .trend-table-wrap { display: block; }
+    .trend-table-wrap table, .trend-table-wrap thead, .trend-table-wrap tbody, .trend-table-wrap tr { display: table; width: 100%; }
+    .trend-table-wrap thead { display: table-header-group; }
+    .trend-table-wrap tbody { display: table-row-group; }
+    .trend-table-wrap tr { display: table-row; }
+    .trend-table-wrap th, .trend-table-wrap td { display: table-cell; width: auto; padding: 6px 8px; }
     .top-card { padding: 16px 18px; }
 
     .deals-panel { padding: 16px 18px; }
@@ -1289,8 +1345,36 @@
 
     <div class="top-bar">
       <button class="top-toggle" id="topToggle">🏆 Top 10 lijsten tonen</button>
+      <button class="top-toggle" id="trendToggle">📈 Verloop tonen</button>
       <button class="export-btn" id="exportBtn">💾 Download aangepaste CSV</button>
       <span class="unsaved-badge hidden" id="unsavedBadge">Niet-opgeslagen wijzigingen</span>
+    </div>
+
+    <div class="trend-panel hidden" id="trendPanel">
+      <div class="trend-head">
+        <h3>📈 Verloop sinds de eerste aankoop</h3>
+        <div class="trend-controls">
+          <span class="period-toggle" data-list="trend">
+            <button type="button" data-period="month" class="active">Maand</button>
+            <button type="button" data-period="quarter">Kwartaal</button>
+            <button type="button" data-period="year">Jaar</button>
+          </span>
+          <button type="button" class="trend-table-btn" id="trendTableBtn">Tabel tonen</button>
+        </div>
+      </div>
+      <div class="trend-summary" id="trendSummary"></div>
+      <div class="trend-legend">
+        <span><i style="background:#C0623F"></i>Uitgaven (inkoop)</span>
+        <span><i style="background:#3E6FB0"></i>Verkoopopbrengst (verdiend)</span>
+      </div>
+      <div class="trend-chart-title">Per periode</div>
+      <p class="trend-chart-sub">Uitgaven tellen in de maand van inkoop, verkoopopbrengst in de maand van verkoop.</p>
+      <div class="trend-chart" id="trendBars"></div>
+      <div class="trend-chart-title">Opgeteld sinds de eerste aankoop</div>
+      <p class="trend-chart-sub">Totaal uitgegeven tegenover totaal verdiend (opgetelde verkoopprijzen), tot en met elke periode.</p>
+      <div class="trend-chart" id="trendCum"></div>
+      <div class="trend-table-wrap hidden" id="trendTableWrap"></div>
+      <p class="trend-note" id="trendNote"></p>
     </div>
 
     <div class="top-panel hidden" id="topPanel">
@@ -1507,7 +1591,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-05-galerij';
+  const APP_VERSION = '2026-11-05-verloop4';
 
   let allRows = [];
   let filteredRows = [];
@@ -1525,6 +1609,8 @@
   let periodModeIncome = 'month';
   let platformMode = 'inkoop';       // 'inkoop' or 'verkoop'
   let viewMode = 'table';            // 'table' of 'gallery'
+  let trendPeriod = 'month';         // 'month', 'quarter' of 'year'
+  let trendShowTable = false;
   try { if (localStorage.getItem('itemsViewMode') === 'gallery') viewMode = 'gallery'; } catch (e) {}
 
   function hardReload() {
@@ -2398,6 +2484,288 @@
       (extras.length > 0 ? ' (' + extras.join(', ') + ')' : '');
 
     if (viewMode === 'gallery') renderGallery(rows);
+    if (!document.getElementById('trendPanel').classList.contains('hidden')) renderTrend();
+  }
+
+  // ===== Verloop-grafiek =====
+  const TREND_SPEND = '#C0623F';
+  const TREND_PROFIT = '#3E6FB0';
+  const MONTHS_NL = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+
+  function trendKey(ym, mode) {
+    const [y, m] = ym.split('-').map(Number);
+    if (mode === 'year') return String(y);
+    if (mode === 'quarter') return y + '-K' + (Math.floor((m - 1) / 3) + 1);
+    return ym;
+  }
+  function trendLabel(key, mode, short) {
+    if (mode === 'year') return key;
+    if (mode === 'quarter') { const [y, q] = key.split('-'); return short ? q + " '" + y.slice(2) : q + ' ' + y; }
+    const [y, m] = key.split('-');
+    return MONTHS_NL[Number(m) - 1] + (short ? " '" + y.slice(2) : ' ' + y);
+  }
+  function euroShort(n) {
+    const sign = n < 0 ? '-' : '';
+    return sign + '€' + Math.round(Math.abs(n)).toLocaleString('nl-NL');
+  }
+  function niceTicks(min, max, count) {
+    if (max === min) max = min + 1;
+    const raw = (max - min) / count;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(f => f * pow).find(st => st >= raw) || 10 * pow;
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v * 100) / 100);
+    return ticks;
+  }
+
+  function buildTrendData() {
+    const isYm = d => /^\d{4}-\d{2}$/.test(d || '');
+    const byId = new Map(allRows.map(r => [rowId(r), r]));
+    const rows = filteredRows.filter(r => !excludedIds.has(rowId(r)) && !r._isBundleHeader);
+    const effPrijs = r => (r._effectivePrijs !== undefined ? r._effectivePrijs : r.prijs);
+    const buys = [], sales = [];
+    let noBuyDate = 0, noSaleDate = 0;
+    rows.forEach(r => {
+      let d = r.inkoopDatum;
+      if (!isYm(d) && r._bundleHeaderId && byId.get(r._bundleHeaderId)) d = byId.get(r._bundleHeaderId).inkoopDatum;
+      if (isYm(d)) buys.push({ d, prijs: effPrijs(r) }); else noBuyDate++;
+      if (r.verkocht) {
+        if (isYm(r.verkoopDatum)) sales.push({ d: r.verkoopDatum, omzet: r.waarde, winst: r.waarde - effPrijs(r) });
+        else noSaleDate++;
+      }
+    });
+    const all = buys.map(b => b.d).concat(sales.map(x => x.d)).sort();
+    if (all.length === 0) return { periods: [], noBuyDate, noSaleDate };
+    const now = new Date();
+    const nowYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const first = all[0], last = all[all.length - 1] > nowYm ? all[all.length - 1] : nowYm;
+
+    // Doorlopende reeks maanden, daarna samenvoegen per gekozen periode
+    const order = [], map = {};
+    let [y, m] = first.split('-').map(Number);
+    const [ly, lm] = last.split('-').map(Number);
+    while (y < ly || (y === ly && m <= lm)) {
+      const k = trendKey(y + '-' + String(m).padStart(2, '0'), trendPeriod);
+      if (!map[k]) { map[k] = { key: k, uitgaven: 0, omzet: 0, winst: 0, gekocht: 0, verkocht: 0 }; order.push(k); }
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    buys.forEach(b => { const p = map[trendKey(b.d, trendPeriod)]; if (p) { p.uitgaven += b.prijs; p.gekocht++; } });
+    sales.forEach(x => { const p = map[trendKey(x.d, trendPeriod)]; if (p) { p.omzet += x.omzet; p.winst += x.winst; p.verkocht++; } });
+    let cu = 0, cw = 0, co = 0;
+    const periods = order.map(k => {
+      const p = map[k];
+      cu += p.uitgaven; cw += p.winst; co += p.omzet;
+      return Object.assign(p, { cumUitgaven: cu, cumWinst: cw, cumOmzet: co });
+    });
+    return { periods, first, noBuyDate, noSaleDate };
+  }
+
+  function trendTipHtml(p) {
+    return `<div class="t-head">${escapeHtml(trendLabel(p.key, trendPeriod, false))}</div>
+      <div class="t-row"><span><i style="background:${TREND_SPEND}"></i>Uitgaven</span><strong>${formatEuro(p.uitgaven)}</strong></div>
+      <div class="t-row"><span><i style="background:${TREND_PROFIT}"></i>Verkoopopbrengst</span><strong>${formatEuro(p.omzet)}</strong></div>
+      <div class="t-row"><span style="padding-left:15px">Winst</span><span>${p.winst >= 0 ? '+' : ''}${formatEuro(p.winst)}</span></div>
+      <div class="t-muted">${p.gekocht} gekocht · ${p.verkocht} verkocht</div>
+      <div class="t-muted">Totaal tot nu: ${formatEuro(p.cumUitgaven)} uitgegeven, ${formatEuro(p.cumOmzet)} verdiend</div>
+      <div class="t-muted">(waarvan ${p.cumWinst >= 0 ? '+' : ''}${formatEuro(p.cumWinst)} winst)</div>`;
+  }
+
+  function placeTip(tip, wrap, x, y) {
+    tip.style.display = 'block';
+    const w = wrap.clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = x + 14; if (left + tw > w) left = x - tw - 14; if (left < 0) left = Math.max(0, (w - tw) / 2);
+    let top = y - th / 2; if (top < 0) top = 0;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+
+  // Staaf met afgeronde uitstekende kant, vlak op de nullijn
+  function barPath(x, w, y0, y1) {
+    const h = Math.abs(y1 - y0); if (h < 0.5) return '';
+    const r = Math.min(4, w / 2, h);
+    if (y1 < y0) { // omhoog
+      return `M${x},${y0}V${y1 + r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 + r}V${y0}Z`;
+    }
+    return `M${x},${y0}V${y1 - r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 - r}V${y0}Z`;
+  }
+
+  function axisSvg(ticks, ys, W, ml, mr) {
+    return ticks.map(t => {
+      const y = ys(t);
+      return `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" stroke="${t === 0 ? '#BFB39A' : '#EFE8D8'}" stroke-width="1"/>
+        <text x="${ml - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="#7A6B5D">${euroShort(t)}</text>`;
+    }).join('');
+  }
+  function xLabelsSvg(periods, xc, H, mb, W, ml, mr) {
+    const band = (W - ml - mr) / periods.length;
+    const every = Math.max(1, Math.ceil(56 / band));
+    return periods.map((p, i) => (i % every === 0 || i === periods.length - 1 && periods.length < 4)
+      ? `<text x="${xc(i)}" y="${H - mb + 18}" text-anchor="middle" font-size="11" fill="#7A6B5D">${escapeHtml(trendLabel(p.key, trendPeriod, true))}</text>` : '').join('');
+  }
+
+  function renderTrendBars(el, periods) {
+    const W = Math.max(300, el.clientWidth), H = 280, ml = 62, mr = 12, mt = 12, mb = 30;
+    const maxV = Math.max(0, ...periods.map(p => Math.max(p.uitgaven, p.omzet)));
+    const minV = 0;
+    const ticksAll = niceTicks(minV, maxV, 5);
+    const t1 = ticksAll[ticksAll.length - 1];
+    const t0 = minV < 0 ? minV - (t1 - minV) * 0.04 : 0;
+    const ticks = ticksAll.filter(t => t >= t0);
+    const ys = v => mt + (t1 - v) / (t1 - t0) * (H - mt - mb);
+    const band = (W - ml - mr) / periods.length;
+    const xc = i => ml + band * (i + 0.5);
+    // Twee staven per periode dicht tegen elkaar, met ruimte tussen de periodes
+    const bw = Math.max(2, Math.min(24, (band * 0.62 - 1) / 2));
+    const y0 = ys(0);
+    let bars = '', hits = '', shade = '';
+    periods.forEach((p, i) => {
+      const cx = xc(i);
+      // Om-en-om een lichte achtergrond per periode, zodat je ziet welke staven bij elkaar horen
+      if (i % 2 === 1) shade += `<rect x="${ml + band * i}" y="${mt}" width="${band}" height="${y0 - mt}" fill="#F9F4E9"/>`;
+      // Scheidingslijn bij elk nieuw jaar (maandweergave)
+      if (trendPeriod === 'month' && i > 0 && p.key.endsWith('-01')) {
+        const lx = ml + band * i;
+        shade += `<line x1="${lx}" x2="${lx}" y1="${mt}" y2="${y0 + 6}" stroke="#D9CFB9" stroke-width="1" stroke-dasharray="3 3"/>`;
+      }
+      bars += `<path d="${barPath(cx - bw - 0.5, bw, y0, ys(p.uitgaven))}" fill="${TREND_SPEND}"/>`;
+      bars += `<path d="${barPath(cx + 0.5, bw, y0, ys(p.omzet))}" fill="${TREND_PROFIT}"/>`;
+      hits += `<rect class="trend-hit" data-i="${i}" x="${ml + band * i}" y="${mt}" width="${band}" height="${H - mt - mb}" fill="transparent"/>`;
+    });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Uitgaven en verkoopopbrengst per periode">
+        ${shade}
+        ${axisSvg(ticks, ys, W, ml, mr)}
+        <rect id="trendBarsHover" x="0" y="${mt}" width="${band}" height="${H - mt - mb}" fill="#EDE3CC" opacity="0" />
+        ${bars}${xLabelsSvg(periods, xc, H, mb, W, ml, mr)}${hits}
+      </svg><div class="trend-tip"></div>`;
+    const tip = el.querySelector('.trend-tip'), hl = el.querySelector('#trendBarsHover');
+    const svg = el.querySelector('svg');
+    el.querySelectorAll('.trend-hit').forEach(r => {
+      r.addEventListener('mousemove', e => {
+        const i = Number(r.dataset.i);
+        hl.setAttribute('x', ml + band * i); hl.setAttribute('opacity', '1');
+        tip.innerHTML = trendTipHtml(periods[i]);
+        const box = el.getBoundingClientRect();
+        placeTip(tip, el, e.clientX - box.left, e.clientY - box.top);
+      });
+    });
+    svg.addEventListener('mouseleave', () => { tip.style.display = 'none'; hl.setAttribute('opacity', '0'); });
+    bindTouch(el, svg, i => { hl.setAttribute('x', ml + band * i); hl.setAttribute('opacity', '1'); return periods[i]; }, x => Math.floor((x - ml) / band), periods.length);
+  }
+
+  function bindTouch(el, svg, onIndex, indexOf, n) {
+    svg.addEventListener('touchstart', e => {
+      const box = el.getBoundingClientRect();
+      const t = e.touches[0];
+      const sx = (t.clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+      const i = Math.max(0, Math.min(n - 1, indexOf(sx)));
+      const tip = el.querySelector('.trend-tip');
+      tip.innerHTML = trendTipHtml(onIndex(i));
+      placeTip(tip, el, t.clientX - box.left, t.clientY - box.top);
+    }, { passive: true });
+  }
+
+  function renderTrendCum(el, periods) {
+    const W = Math.max(300, el.clientWidth), H = 230, ml = 62, mr = 112, mt = 14, mb = 30;
+    const maxV = Math.max(0, ...periods.map(p => Math.max(p.cumUitgaven, p.cumOmzet)));
+    const minV = 0;
+    const ticksAll = niceTicks(minV, maxV, 4);
+    const t1 = ticksAll[ticksAll.length - 1];
+    const t0 = minV < 0 ? minV - (t1 - minV) * 0.04 : 0;
+    const ticks = ticksAll.filter(t => t >= t0);
+    const ys = v => mt + (t1 - v) / (t1 - t0) * (H - mt - mb);
+    const n = periods.length;
+    const step = n > 1 ? (W - ml - mr) / (n - 1) : 0;
+    const xc = i => n > 1 ? ml + step * i : ml + (W - ml - mr) / 2;
+    const line = key => periods.map((p, i) => (i ? 'L' : 'M') + xc(i).toFixed(1) + ',' + ys(p[key]).toFixed(1)).join('');
+    const lastP = periods[n - 1];
+    let ly1 = ys(lastP.cumUitgaven), ly2 = ys(lastP.cumOmzet);
+    if (Math.abs(ly1 - ly2) < 36) { if (ly1 <= ly2) { ly2 = ly1 + 36; } else { ly1 = ly2 + 36; } }
+    const lx = xc(n - 1) + 10;
+    const endLabel = (y, title, val) => `<text x="${lx}" y="${y - 2}" font-size="11" fill="#7A6B5D">${title}</text>
+      <text x="${lx}" y="${y + 12}" font-size="12" font-weight="700" fill="#3D2F1F">${val}</text>`;
+    const xl = (() => {
+      const band = n > 1 ? step : W;
+      const every = Math.max(1, Math.ceil(56 / band));
+      return periods.map((p, i) => i % every === 0 ? `<text x="${xc(i)}" y="${H - mb + 18}" text-anchor="middle" font-size="11" fill="#7A6B5D">${escapeHtml(trendLabel(p.key, trendPeriod, true))}</text>` : '').join('');
+    })();
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Opgeteld uitgegeven en verdiend">
+        ${axisSvg(ticks, ys, W, ml, mr)}
+        <line id="cumCross" x1="0" x2="0" y1="${mt}" y2="${H - mb}" stroke="#BFB39A" stroke-width="1" opacity="0"/>
+        <path d="${line('cumUitgaven')}" fill="none" stroke="${TREND_SPEND}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="${line('cumOmzet')}" fill="none" stroke="${TREND_PROFIT}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${xc(n - 1)}" cy="${ys(lastP.cumUitgaven)}" r="4" fill="${TREND_SPEND}" stroke="white" stroke-width="2"/>
+        <circle cx="${xc(n - 1)}" cy="${ys(lastP.cumOmzet)}" r="4" fill="${TREND_PROFIT}" stroke="white" stroke-width="2"/>
+        ${endLabel(ly1, 'Uitgegeven', euroShort(lastP.cumUitgaven))}
+        ${endLabel(ly2, 'Verdiend', euroShort(lastP.cumOmzet))}
+        <circle id="cumDot1" r="4" fill="${TREND_SPEND}" stroke="white" stroke-width="2" opacity="0"/>
+        <circle id="cumDot2" r="4" fill="${TREND_PROFIT}" stroke="white" stroke-width="2" opacity="0"/>
+        ${xl}
+        <rect id="cumHit" x="${ml - 10}" y="${mt}" width="${W - ml - mr + 20}" height="${H - mt - mb}" fill="transparent"/>
+      </svg><div class="trend-tip"></div>`;
+    const svg = el.querySelector('svg'), tip = el.querySelector('.trend-tip');
+    const cross = el.querySelector('#cumCross'), d1 = el.querySelector('#cumDot1'), d2 = el.querySelector('#cumDot2');
+    const idxOf = sx => n > 1 ? Math.round((sx - ml) / step) : 0;
+    const show = i => {
+      const x = xc(i), p = periods[i];
+      cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '1');
+      d1.setAttribute('cx', x); d1.setAttribute('cy', ys(p.cumUitgaven)); d1.setAttribute('opacity', '1');
+      d2.setAttribute('cx', x); d2.setAttribute('cy', ys(p.cumOmzet)); d2.setAttribute('opacity', '1');
+      return p;
+    };
+    el.querySelector('#cumHit').addEventListener('mousemove', e => {
+      const box = el.getBoundingClientRect();
+      const sx = (e.clientX - box.left) * (W / box.width);
+      const i = Math.max(0, Math.min(n - 1, idxOf(sx)));
+      tip.innerHTML = trendTipHtml(show(i));
+      placeTip(tip, el, xc(i) * (box.width / W), e.clientY - box.top);
+    });
+    svg.addEventListener('mouseleave', () => {
+      tip.style.display = 'none';
+      [cross, d1, d2].forEach(x => x.setAttribute('opacity', '0'));
+    });
+    bindTouch(el, svg, show, idxOf, n);
+  }
+
+  function renderTrend() {
+    const data = buildTrendData();
+    const periods = data.periods;
+    const bars = document.getElementById('trendBars'), cum = document.getElementById('trendCum');
+    const summary = document.getElementById('trendSummary'), note = document.getElementById('trendNote');
+    const tableWrap = document.getElementById('trendTableWrap');
+    if (periods.length === 0) {
+      summary.innerHTML = '';
+      bars.innerHTML = '<div class="trend-empty">Geen items met een inkoop- of verkoopdatum in deze selectie</div>';
+      cum.innerHTML = ''; tableWrap.innerHTML = ''; note.textContent = '';
+      return;
+    }
+    const lbl = k => trendLabel(k, trendPeriod, false);
+    const priciest = periods.reduce((a, b) => b.uitgaven > a.uitgaven ? b : a);
+    const best = periods.reduce((a, b) => b.omzet > a.omzet ? b : a);
+    const last = periods[periods.length - 1];
+    const fy = data.first.split('-');
+    const unit = trendPeriod === 'year' ? 'jaar' : trendPeriod === 'quarter' ? 'kwartaal' : 'maand';
+    const fact = (l, v, sub) => `<div class="trend-fact"><span class="lbl">${l}</span><span class="val">${v}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
+    summary.innerHTML =
+      fact('Eerste aankoop', MONTHS_NL[Number(fy[1]) - 1] + ' ' + fy[0], periods.length + ' ' + (trendPeriod === 'year' ? 'jaar' : trendPeriod === 'quarter' ? 'kwartalen' : 'maanden') + ' tot nu') +
+      fact('Duurste ' + unit, escapeHtml(lbl(priciest.key)), formatEuro(priciest.uitgaven) + ' uitgegeven') +
+      fact('Beste ' + unit, best.omzet > 0 ? escapeHtml(lbl(best.key)) : '—', best.omzet > 0 ? formatEuro(best.omzet) + ' verdiend' : 'nog niets verkocht') +
+      fact('Totaal', formatEuro(last.cumUitgaven) + ' uit', formatEuro(last.cumOmzet) + ' verdiend (' + (last.cumWinst >= 0 ? '+' : '') + formatEuro(last.cumWinst) + ' winst)');
+
+    renderTrendBars(bars, periods);
+    renderTrendCum(cum, periods);
+
+    if (trendShowTable) {
+      tableWrap.innerHTML = `<table><thead><tr><th>Periode</th><th>Uitgaven</th><th>Verkoopopbrengst</th><th>Winst</th><th>Gekocht</th><th>Verkocht</th><th>Totaal uitgegeven</th><th>Totaal verdiend</th><th>Totaal winst</th></tr></thead><tbody>` +
+        periods.map(p => `<tr><td>${escapeHtml(lbl(p.key))}</td><td>${formatEuro(p.uitgaven)}</td><td>${formatEuro(p.omzet)}</td><td class="${p.winst > 0 ? 'positive' : p.winst < 0 ? 'negative' : ''}">${p.winst > 0 ? '+' : ''}${formatEuro(p.winst)}</td><td>${p.gekocht}</td><td>${p.verkocht}</td><td>${formatEuro(p.cumUitgaven)}</td><td>${formatEuro(p.cumOmzet)}</td><td>${p.cumWinst > 0 ? '+' : ''}${formatEuro(p.cumWinst)}</td></tr>`).join('') +
+        '</tbody></table>';
+    }
+    tableWrap.classList.toggle('hidden', !trendShowTable);
+    document.getElementById('trendTableBtn').textContent = trendShowTable ? 'Tabel verbergen' : 'Tabel tonen';
+
+    const notes = ['Volgt je filters en uitsluitingen. Bundelprijzen zijn verdeeld over de items.'];
+    if (data.noBuyDate > 0) notes.push(data.noBuyDate + ' item' + (data.noBuyDate === 1 ? '' : 's') + ' zonder inkoopdatum ' + (data.noBuyDate === 1 ? 'telt' : 'tellen') + ' niet mee in de uitgaven.');
+    if (data.noSaleDate > 0) notes.push(data.noSaleDate + ' verkocht' + (data.noSaleDate === 1 ? ' item' : 'e items') + ' zonder verkoopdatum ' + (data.noSaleDate === 1 ? 'telt' : 'tellen') + ' niet mee in verdiend en winst.');
+    note.textContent = notes.join(' ');
   }
 
   // ===== Galerijweergave =====
@@ -2896,6 +3264,25 @@
 
   document.getElementById('clearExclusions').addEventListener('click', clearAllExclusions);
 
+  // Verloop-grafiek
+  document.getElementById('trendToggle').addEventListener('click', () => {
+    const panel = document.getElementById('trendPanel');
+    const hidden = panel.classList.toggle('hidden');
+    document.getElementById('trendToggle').textContent = hidden ? '📈 Verloop tonen' : '📈 Verloop verbergen';
+    if (!hidden) renderTrend();
+  });
+  document.getElementById('trendTableBtn').addEventListener('click', () => {
+    trendShowTable = !trendShowTable;
+    renderTrend();
+  });
+  let trendResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(trendResizeTimer);
+    trendResizeTimer = setTimeout(() => {
+      if (!document.getElementById('trendPanel').classList.contains('hidden')) renderTrend();
+    }, 150);
+  });
+
   // Top 10 toggle
   document.getElementById('topToggle').addEventListener('click', () => {
     const panel = document.getElementById('topPanel');
@@ -2915,11 +3302,12 @@
         const period = btn.dataset.period;
         if (list === 'spending') periodModeSpending = period;
         else if (list === 'income') periodModeIncome = period;
+        else if (list === 'trend') trendPeriod = period;
       } else if (btn.dataset.mode && list === 'platform') {
         platformMode = btn.dataset.mode;
       }
       group.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
-      renderTopLists();
+      if (list === 'trend') renderTrend(); else renderTopLists();
     });
   });
 
