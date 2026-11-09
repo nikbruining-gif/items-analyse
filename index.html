@@ -1634,7 +1634,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-05-tooltipsluiten';
+  const APP_VERSION = '2026-11-09-mobiel-geheugen';
 
   let allRows = [];
   let filteredRows = [];
@@ -1802,6 +1802,46 @@
   }
 
   // Scroll to the table row with the given _idx and briefly highlight it.
+  // ===== Geheugenzuinig op mobiel =====
+  // Telefoons hebben een strenge geheugenlimiet per tabblad. Grote (camera)foto's kosten uitgepakt
+  // tientallen MB's per stuk, dus op mobiel laten we foto's die ver uit beeld zijn weer los.
+  function isLowMemoryDevice() {
+    try { return window.matchMedia('(max-width: 900px), (pointer: coarse)').matches; } catch (e) { return false; }
+  }
+  function scrollBehavior() { return isLowMemoryDevice() ? 'auto' : 'smooth'; }
+
+  const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  let imgObserver = null;
+  const observedImgs = new Set();
+
+  function manageImages() {
+    if (!isLowMemoryDevice() || !('IntersectionObserver' in window)) return;
+    if (!imgObserver) {
+      imgObserver = new IntersectionObserver(entries => {
+        entries.forEach(en => {
+          const img = en.target;
+          if (!img.isConnected) { imgObserver.unobserve(img); observedImgs.delete(img); return; }
+          const real = img.dataset.realSrc;
+          if (!real) return;
+          if (en.isIntersecting) {
+            if (img.getAttribute('src') !== real) img.setAttribute('src', real);
+          } else if (img.getAttribute('src') !== BLANK_IMG) {
+            img.setAttribute('src', BLANK_IMG); // geheugen van de foto vrijgeven
+          }
+        });
+      }, { rootMargin: '600px 0px' });
+    }
+    // Opruimen: verwijderde foto's niet langer volgen
+    observedImgs.forEach(img => { if (!img.isConnected) { imgObserver.unobserve(img); observedImgs.delete(img); } });
+    document.querySelectorAll('img.foto-thumb[data-foto-url], .gallery-photo img[data-foto-url], img.top-foto[data-foto-url]').forEach(img => {
+      if (observedImgs.has(img)) return;
+      img.dataset.realSrc = img.getAttribute('src');
+      img.setAttribute('src', BLANK_IMG); // pas laden als hij (bijna) in beeld komt
+      observedImgs.add(img);
+      imgObserver.observe(img);
+    });
+  }
+
   function scrollToRow(idx) {
     if (viewMode === 'gallery') setViewMode('table');
     const row = document.querySelector('tbody tr[data-row-idx="' + idx + '"]');
@@ -1826,7 +1866,8 @@
       }
       return;
     }
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Op mobiel direct springen: bij vloeiend scrollen laden alle foto's onderweg en loopt het geheugen vol
+    row.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     row.classList.add('row-highlight');
     setTimeout(() => row.classList.remove('row-highlight'), 2000);
   }
@@ -2503,7 +2544,7 @@
         // Foto cell
         const fotoFull = fotoUrl(r.foto);
         const fotoCell = fotoFull
-          ? `<td data-label="Foto"><img class="foto-thumb" src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy"></td>`
+          ? `<td data-label="Foto"><img class="foto-thumb" src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy" decoding="async"></td>`
           : `<td data-label="Foto"><span class="foto-empty" title="Nog geen foto">📷</span></td>`;
 
         return `<tr class="${rowClasses.join(' ')}" data-row-idx="${r._idx}">
@@ -2549,6 +2590,7 @@
 
     if (viewMode === 'gallery') renderGallery(rows);
     if (!document.getElementById('trendPanel').classList.contains('hidden')) renderTrend();
+    manageImages();
   }
 
   // ===== Verloop-grafiek =====
@@ -2600,7 +2642,7 @@
     trendSel = { key, mode: trendPeriod, kind: trendSel ? trendSel.kind : 'both' };
     applyFilters();
     const chip = document.getElementById('periodFilter');
-    if (chip) chip.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (chip) chip.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   }
 
   function updatePeriodFilterChip() {
@@ -2955,7 +2997,7 @@
 
       const fotoFull = fotoUrl(r.foto);
       const fotoHtml = fotoFull
-        ? `<img src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy">`
+        ? `<img src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy" decoding="async">`
         : '<span class="gallery-photo-empty" title="Nog geen foto">📷</span>';
 
       const prijsLbl = isBundleHeader ? 'Prijs (totaal)' : (isBundleItem ? 'Prijs (aandeel)' : 'Prijs');
@@ -3361,7 +3403,7 @@
       if (m.foto !== undefined) {
         const url = fotoUrl(m.foto);
         fotoHtml = url
-          ? `<img class="top-foto" src="${escapeHtml(url)}" alt="${escapeHtml(m.name)}" data-foto-url="${escapeHtml(url)}" loading="lazy">`
+          ? `<img class="top-foto" src="${escapeHtml(url)}" alt="${escapeHtml(m.name)}" data-foto-url="${escapeHtml(url)}" loading="lazy" decoding="async">`
           : `<span class="top-foto top-foto-empty" title="Nog geen foto">📷</span>`;
       }
       return `<li${m.foto !== undefined ? ' class="has-foto"' : ''}>
@@ -3385,6 +3427,7 @@
         img.replaceWith(ph);
       }, { once: true });
     });
+    manageImages();
   }
 
   // Wire up filter events
@@ -3415,7 +3458,7 @@
   });
   document.getElementById('periodFilterClear').addEventListener('click', () => { trendSel = null; applyFilters(); });
   document.getElementById('periodFilterBack').addEventListener('click', () => {
-    document.getElementById('trendPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('trendPanel').scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   });
 
   // Verloop-grafiek
