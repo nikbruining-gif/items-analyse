@@ -1634,7 +1634,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-09-mobiel-geheugen';
+  const APP_VERSION = '2026-11-09-thumbnails';
 
   let allRows = [];
   let filteredRows = [];
@@ -2251,6 +2251,30 @@
     return 'images/' + clean;
   }
 
+  // Kleine versie van een foto: images/thumbs/<zelfde pad>. Gemaakt door de GitHub Action
+  // (.github/workflows/thumbnails.yml). Volledige URL's (https://...) hebben geen thumbnail.
+  function thumbUrl(value) {
+    const full = fotoUrl(value);
+    if (!full || /^https?:\/\//i.test(full)) return full;
+    return full.replace(/^images\//, 'images/thumbs/');
+  }
+  // Attributen voor een thumbnail-<img>: toont de thumbnail, lightbox opent het origineel
+  function thumbImgAttrs(value) {
+    const full = fotoUrl(value), thumb = thumbUrl(value);
+    return `src="${escapeHtml(thumb)}" data-foto-url="${escapeHtml(full)}"` + (thumb !== full ? ' data-thumb="1"' : '');
+  }
+  // Bestaat de thumbnail (nog) niet, dan valt de foto terug op het origineel.
+  // Capture-fase op document: dit loopt vóór de eigen error-handlers van de foto (die tonen pas de 📷 als ook het origineel faalt).
+  document.addEventListener('error', e => {
+    const img = e.target;
+    if (!img || img.tagName !== 'IMG' || img.dataset.thumb !== '1' || img.dataset.thumbFailed) return;
+    img.dataset.thumbFailed = '1';
+    const full = img.dataset.fotoUrl;
+    if (img.dataset.realSrc) img.dataset.realSrc = full;
+    e.stopImmediatePropagation();
+    img.setAttribute('src', full);
+  }, true);
+
   function openLightbox(url) {
     const box = document.getElementById('lightbox');
     const img = document.getElementById('lightboxImg');
@@ -2544,7 +2568,7 @@
         // Foto cell
         const fotoFull = fotoUrl(r.foto);
         const fotoCell = fotoFull
-          ? `<td data-label="Foto"><img class="foto-thumb" src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy" decoding="async"></td>`
+          ? `<td data-label="Foto"><img class="foto-thumb" ${thumbImgAttrs(r.foto)} alt="${escapeHtml(r.naam)}" loading="lazy" decoding="async"></td>`
           : `<td data-label="Foto"><span class="foto-empty" title="Nog geen foto">📷</span></td>`;
 
         return `<tr class="${rowClasses.join(' ')}" data-row-idx="${r._idx}">
@@ -2997,7 +3021,7 @@
 
       const fotoFull = fotoUrl(r.foto);
       const fotoHtml = fotoFull
-        ? `<img src="${escapeHtml(fotoFull)}" alt="${escapeHtml(r.naam)}" data-foto-url="${escapeHtml(fotoFull)}" loading="lazy" decoding="async">`
+        ? `<img ${thumbImgAttrs(r.foto)} alt="${escapeHtml(r.naam)}" loading="lazy" decoding="async">`
         : '<span class="gallery-photo-empty" title="Nog geen foto">📷</span>';
 
       const prijsLbl = isBundleHeader ? 'Prijs (totaal)' : (isBundleItem ? 'Prijs (aandeel)' : 'Prijs');
@@ -3403,7 +3427,7 @@
       if (m.foto !== undefined) {
         const url = fotoUrl(m.foto);
         fotoHtml = url
-          ? `<img class="top-foto" src="${escapeHtml(url)}" alt="${escapeHtml(m.name)}" data-foto-url="${escapeHtml(url)}" loading="lazy" decoding="async">`
+          ? `<img class="top-foto" ${thumbImgAttrs(m.foto)} alt="${escapeHtml(m.name)}" loading="lazy" decoding="async">`
           : `<span class="top-foto top-foto-empty" title="Nog geen foto">📷</span>`;
       }
       return `<li${m.foto !== undefined ? ' class="has-foto"' : ''}>
