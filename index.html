@@ -1653,7 +1653,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-09-laatste-csv';
+  const APP_VERSION = '2026-11-09-spaties-merk';
 
   let allRows = [];
   let filteredRows = [];
@@ -2186,6 +2186,28 @@
     return '€' + n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Tekst opschonen: spaties voor/achter weg, dubbele spaties en harde spaties (uit Excel) gelijk trekken
+  function normText(v) {
+    return String(v == null ? '' : v).replace(/[\u00A0\u2007\u202F\t]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // Varianten die alleen in hoofdletters verschillen krijgen de spelling die het vaakst voorkomt
+  function unifySpelling(field) {
+    const counts = new Map(); // lowercase -> Map(spelling -> aantal)
+    allRows.forEach(r => {
+      const v = r[field]; if (!v) return;
+      const k = v.toLocaleLowerCase('nl-NL');
+      if (!counts.has(k)) counts.set(k, new Map());
+      const m = counts.get(k); m.set(v, (m.get(v) || 0) + 1);
+    });
+    const best = new Map();
+    counts.forEach((m, k) => {
+      let top = null, n = -1;
+      m.forEach((c, sp) => { if (c > n) { top = sp; n = c; } });
+      best.set(k, top);
+    });
+    allRows.forEach(r => { const v = r[field]; if (v) r[field] = best.get(v.toLocaleLowerCase('nl-NL')); });
+  }
+
   function processData(rawData, fields) {
     columns = [...fields];
     const colNaam = findCol(fields, ['Naam', 'Name', 'Item']);
@@ -2222,16 +2244,16 @@
     const cleanStr = v => ((v == null ? '' : v) + '').trim();
     allRows = rawData.map((r, idx) => ({
       _idx: idx,
-      naam: colNaam ? (r[colNaam] || '') : '',
-      merk: colMerk ? (r[colMerk] || '') : '',
+      naam: colNaam ? normText(r[colNaam]) : '',
+      merk: colMerk ? normText(r[colMerk]) : '',
       prijs: parseNumber(colPrijs ? r[colPrijs] : 0),
       waarde: parseNumber(colWaarde ? r[colWaarde] : 0),
       verkocht: colVerkocht ? parseBool(r[colVerkocht]) : false,
-      staat: colStaat ? (r[colStaat] || '') : '',
+      staat: colStaat ? normText(r[colStaat]) : '',
       doos: colDoos ? parseBool(r[colDoos]) : false,
       foto: cleanStr(r[colFoto]),
-      inkoopPlatform: cleanStr(r[colInkoopPlatform]),
-      verkoopPlatform: cleanStr(r[colVerkoopPlatform]),
+      inkoopPlatform: normText(r[colInkoopPlatform]),
+      verkoopPlatform: normText(r[colVerkoopPlatform]),
       inkoopDatum: cleanStr(r[colInkoopDatum]),
       verkoopDatum: cleanStr(r[colVerkoopDatum]),
       _raw: {
@@ -2243,6 +2265,9 @@
         [colVerkoopDatum]: cleanStr(r[colVerkoopDatum])
       }
     }));
+
+    // Zelfde merk/staat/platform met andere hoofdletters ("pelikan" en "Pelikan") samenvoegen
+    ['merk', 'staat', 'inkoopPlatform', 'verkoopPlatform'].forEach(unifySpelling);
 
     hasUnsavedChanges = false;
     updateUnsavedBadge();
@@ -3190,12 +3215,15 @@
     if (!row) return;
 
     const oldNaam = row.naam;
-    row.naam = document.getElementById('editNaam').value;
-    row.merk = document.getElementById('editMerk').value;
+    row.naam = normText(document.getElementById('editNaam').value);
+    row.merk = normText(document.getElementById('editMerk').value);
+    // Bestaand merk met andere hoofdletters? Dan dezelfde spelling aanhouden
+    const sameBrand = allRows.find(r => r !== row && r.merk && r.merk.toLocaleLowerCase('nl-NL') === row.merk.toLocaleLowerCase('nl-NL'));
+    if (sameBrand) row.merk = sameBrand.merk;
     row.prijs = parseNumber(document.getElementById('editPrijs').value);
     row.waarde = parseNumber(document.getElementById('editWaarde').value);
     row.verkocht = document.getElementById('editVerkocht').value === 'true';
-    row.staat = document.getElementById('editStaat').value;
+    row.staat = normText(document.getElementById('editStaat').value);
     row.doos = document.getElementById('editDoos').value === 'true';
     row.foto = document.getElementById('editFoto').value.trim();
     row.inkoopPlatform = document.getElementById('editInkoopPlatform').value.trim();
