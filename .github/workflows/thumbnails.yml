@@ -1,0 +1,115 @@
+# Maakt automatisch kleine versies (thumbnails) van alle foto's in images/
+# en zet ze in images/thumbs/ (zelfde bestandsnaam). De app gebruikt die
+# voor de lijst, de galerij en de Top 10; de lightbox toont het origineel.
+#
+# Draait bij elke push waarin iets in images/ verandert, en handmatig via
+# Actions → "Thumbnails maken" → "Run workflow".
+
+name: Thumbnails maken
+
+on:
+  push:
+    paths:
+      - 'images/**'
+      - '!images/thumbs/**'
+      - '.github/workflows/thumbnails.yml'
+  workflow_dispatch:
+
+# Alleen schrijfrechten op de inhoud van deze repo (om de thumbnails te committen)
+permissions:
+  contents: write
+
+# Nooit twee runs tegelijk, zodat ze elkaars commit niet in de weg zitten
+concurrency:
+  group: thumbnails
+  cancel-in-progress: false
+
+jobs:
+  thumbnails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo ophalen
+        uses: actions/checkout@v4
+
+      - name: Python installeren
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Pillow installeren
+        run: pip install "Pillow==11.0.0"
+
+      - name: Thumbnails maken
+        shell: python
+        run: |
+          import hashlib, json
+          from pathlib import Path
+          from PIL import Image, ImageOps
+
+          SRC = Path("images")
+          DST = SRC / "thumbs"
+          MANIFEST = DST / "_bron.json"   # onthoudt van welke versie van elke foto de thumbnail is gemaakt
+          MAX = 600        # langste zijde in pixels (scherp genoeg voor de galerij op retina-schermen)
+          QUALITY = 80
+          EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+          try:
+              manifest = json.loads(MANIFEST.read_text())
+          except Exception:
+              manifest = {}
+          new_manifest = {}
+          made = skipped = removed = failed = 0
+
+          for src in sorted(SRC.rglob("*")):
+              if not src.is_file() or DST in src.parents or src.suffix.lower() not in EXTS:
+                  continue
+              rel = src.relative_to(SRC).as_posix()
+              dst = DST / rel
+              digest = hashlib.sha1(src.read_bytes()).hexdigest()
+              # Alleen (opnieuw) maken als de thumbnail ontbreekt of de foto is veranderd
+              if dst.exists() and manifest.get(rel) == digest:
+                  new_manifest[rel] = digest
+                  skipped += 1
+                  continue
+              try:
+                  with Image.open(src) as im:
+                      im = ImageOps.exif_transpose(im)   # telefoonfoto's goed rechtop
+                      im.thumbnail((MAX, MAX), Image.LANCZOS)
+                      dst.parent.mkdir(parents=True, exist_ok=True)
+                      ext = src.suffix.lower()
+                      if ext in (".jpg", ".jpeg"):
+                          im.convert("RGB").save(dst, "JPEG", quality=QUALITY, optimize=True, progressive=True)
+                      elif ext == ".webp":
+                          im.save(dst, "WEBP", quality=QUALITY)
+                      else:
+                          im.save(dst, "PNG", optimize=True)
+                  new_manifest[rel] = digest
+                  made += 1
+              except Exception as e:
+                  failed += 1
+                  print(f"::warning file={src}::Kon geen thumbnail maken: {e}")
+
+          # Thumbnails opruimen waarvan de originele foto is verwijderd
+          if DST.exists():
+              for t in DST.rglob("*"):
+                  if t.is_file() and t != MANIFEST and t.relative_to(DST).as_posix() not in new_manifest \
+                          and not (SRC / t.relative_to(DST)).exists():
+                      t.unlink()
+                      removed += 1
+
+          DST.mkdir(parents=True, exist_ok=True)
+          MANIFEST.write_text(json.dumps(new_manifest, indent=1, sort_keys=True) + "\n")
+          print(f"Gemaakt: {made}, al up-to-date: {skipped}, opgeruimd: {removed}, mislukt: {failed}")
+
+      - name: Thumbnails committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add -A images/thumbs
+          if git diff --cached --quiet; then
+            echo "Geen nieuwe thumbnails."
+          else
+            git commit -m "Thumbnails bijgewerkt"
+            git pull --rebase
+            git push
+          fi
