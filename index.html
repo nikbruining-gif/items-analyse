@@ -130,6 +130,18 @@
   }
   .upload-zone:hover .upload-btn { background: #464727; }
   .upload-zone p { margin: 15px 0 0 0; color: #7A6B5D; }
+  .remembered-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #F5F0DC; border: 1px solid #E5DCC8; border-radius: 10px;
+    padding: 10px 14px; margin: -14px 0 24px; font-size: 13px; color: #3D2F1F;
+  }
+  .remembered-bar .rb-sub { color: #7A6B5D; }
+  .remembered-bar .rb-spacer { flex: 1; }
+  .remembered-bar button {
+    border: 1px solid #D9CFB9; background: white; color: #8B3A1F; font-weight: 600; font-size: 12px;
+    padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .remembered-bar button:hover { background: #8B3A1F; color: white; }
 
   .stats-grid {
     display: grid;
@@ -1334,6 +1346,13 @@
     <p style="font-size: 12px; margin-top: 8px;">Verwachte kolommen: Naam, Merk, Prijs, Waarde, Verkocht, staat, originele doos</p>
   </label>
 
+  <div class="remembered-bar hidden" id="rememberedBar">
+    <span>📂 <strong id="rememberedName"></strong></span>
+    <span class="rb-sub" id="rememberedSub"></span>
+    <span class="rb-spacer"></span>
+    <button type="button" id="rememberedForget" title="Het onthouden bestand van dit apparaat verwijderen">Vergeten</button>
+  </div>
+
   <div id="errorMsg" class="error hidden"></div>
   <pre id="debugLog" style="background:#2d2d2d;color:#c5e478;font-family:monospace;font-size:12px;padding:10px;border-radius:6px;max-height:180px;overflow:auto;margin-bottom:16px;white-space:pre-wrap;word-break:break-all;display:none;"></pre>
   <button type="button" id="debugToggle" style="background:transparent;border:1px solid #C9BFA8;color:#7A6B5D;padding:6px 12px;border-radius:6px;font-size:12px;margin-bottom:16px;cursor:pointer;">🔍 Debug log tonen</button>
@@ -1634,7 +1653,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-09-thumbnails';
+  const APP_VERSION = '2026-11-09-laatste-csv';
 
   let allRows = [];
   let filteredRows = [];
@@ -1992,32 +2011,7 @@
         showError('Bestand kon niet als tekst gelezen worden.');
         return;
       }
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      if (!text.trim()) { showError('Bestand is leeg.'); return; }
-      showStatus('⏳ Parsen van CSV (' + text.length + ' tekens)...');
-      try {
-        const results = Papa.parse(text, {
-          header: true, skipEmptyLines: true, dynamicTyping: false,
-          delimitersToGuess: [',', ';', '\t', '|']
-        });
-        dbg('Papa parsed ' + (results.data ? results.data.length : 0) + ' rows, fields=' + JSON.stringify(results.meta && results.meta.fields));
-        if (results.errors && results.errors.length > 0) console.warn('CSV parse warnings:', results.errors);
-        if (!results.data || results.data.length === 0) {
-          showError('Geen data gevonden in "' + file.name + '". Eerste regel: ' + text.split('\n')[0].slice(0, 120));
-          return;
-        }
-        try {
-          processData(results.data, results.meta.fields);
-          dbg('processData OK');
-          clearStatus();
-        } catch (err) {
-          dbg('processData ERROR: ' + err.message);
-          showError('Fout bij verwerken: ' + err.message);
-        }
-      } catch (err) {
-        dbg('Papa ERROR: ' + err.message);
-        showError('Fout bij parsen: ' + (err && err.message ? err.message : String(err)));
-      }
+      loadCsvText(text, file.name, { remember: true });
     };
     try {
       reader.readAsText(file, 'UTF-8');
@@ -2026,6 +2020,86 @@
       dbg('readAsText gooide: ' + err.message);
       showError('Kan bestand niet openen: ' + (err && err.message ? err.message : String(err)));
     }
+  }
+
+  // CSV-tekst inlezen (uit een gekozen bestand, of uit het geheugen van dit apparaat)
+  function loadCsvText(text, fileName, opts) {
+    opts = opts || {};
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    if (!text.trim()) { showError('Bestand is leeg.'); return false; }
+    originalFileName = String(fileName || 'items.csv').replace(/\.csv$/i, '') + '-aangepast.csv';
+    showStatus('⏳ Parsen van CSV (' + text.length + ' tekens)...');
+    try {
+      const results = Papa.parse(text, {
+        header: true, skipEmptyLines: true, dynamicTyping: false,
+        delimitersToGuess: [',', ';', '\t', '|']
+      });
+      dbg('Papa parsed ' + (results.data ? results.data.length : 0) + ' rows, fields=' + JSON.stringify(results.meta && results.meta.fields));
+      if (results.errors && results.errors.length > 0) console.warn('CSV parse warnings:', results.errors);
+      if (!results.data || results.data.length === 0) {
+        showError('Geen data gevonden in "' + fileName + '". Eerste regel: ' + text.split('\n')[0].slice(0, 120));
+        return false;
+      }
+      try {
+        processData(results.data, results.meta.fields);
+        dbg('processData OK');
+        clearStatus();
+      } catch (err) {
+        dbg('processData ERROR: ' + err.message);
+        showError('Fout bij verwerken: ' + err.message);
+        return false;
+      }
+    } catch (err) {
+      dbg('Papa ERROR: ' + err.message);
+      showError('Fout bij parsen: ' + (err && err.message ? err.message : String(err)));
+      return false;
+    }
+    if (opts.remember) rememberCsv(text, fileName, false);
+    if (opts.unsaved) { hasUnsavedChanges = true; updateUnsavedBadge(); }
+    updateRememberedBar(opts.restored);
+    return true;
+  }
+
+  // ===== Laatste CSV onthouden (alleen in de browser van dit apparaat) =====
+  const REMEMBER_KEY = 'itemsLastCsv';
+  let rememberedName = '';
+  function readRemembered() {
+    try { const v = JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null'); return v && typeof v.text === 'string' ? v : null; }
+    catch (e) { return null; }
+  }
+  function rememberCsv(text, name, unsaved) {
+    try {
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ name: name || 'items.csv', text, savedAt: Date.now(), unsaved: !!unsaved }));
+      rememberedName = name || 'items.csv';
+      return true;
+    } catch (e) {
+      console.warn('CSV onthouden mislukt:', e);
+      return false;
+    }
+  }
+  function forgetCsv() {
+    try { localStorage.removeItem(REMEMBER_KEY); } catch (e) {}
+    updateRememberedBar(false);
+  }
+  // Huidige stand (inclusief bewerkingen) bewaren, zodat die er na herladen ook nog is
+  function rememberCurrentState(unsaved) {
+    if (allRows.length === 0) return;
+    const prev = readRemembered();
+    rememberCsv(buildCsvText(), (prev && prev.name) || rememberedName || 'items.csv', unsaved);
+    updateRememberedBar(false);
+  }
+  function updateRememberedBar(restored) {
+    const bar = document.getElementById('rememberedBar');
+    if (!bar) return;
+    const r = readRemembered();
+    if (!r) { bar.classList.add('hidden'); return; }
+    const d = new Date(r.savedAt || Date.now());
+    const when = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('rememberedName').textContent = r.name;
+    document.getElementById('rememberedSub').textContent =
+      (restored ? 'Automatisch geopend' : 'Wordt onthouden op dit apparaat') + ' · bijgewerkt ' + when +
+      (r.unsaved ? ' · met wijzigingen die nog niet als CSV zijn gedownload' : '');
+    bar.classList.remove('hidden');
   }
 
   function showError(msg) {
@@ -3176,6 +3250,7 @@
     renderExclusionsPanel();
     renderBundlesPanel();
     closeEdit();
+    rememberCurrentState(true); // bewerkingen ook onthouden op dit apparaat
   }
 
   function updateUnsavedBadge() {
@@ -3184,8 +3259,7 @@
     else badge.classList.add('hidden');
   }
 
-  function exportCsv() {
-    if (allRows.length === 0) return;
+  function buildCsvText() {
     // Build data using original field order, falling back to all keys
     const fields = columns && columns.length ? columns : Object.keys(allRows[0]._raw);
     const rows = [...allRows].sort((a, b) => a._idx - b._idx).map(r => {
@@ -3193,7 +3267,12 @@
       fields.forEach(f => { obj[f] = r._raw[f] != null ? r._raw[f] : ''; });
       return obj;
     });
-    const csv = Papa.unparse(rows, { delimiter: ';', quotes: false });
+    return Papa.unparse(rows, { delimiter: ';', quotes: false });
+  }
+
+  function exportCsv() {
+    if (allRows.length === 0) return;
+    const csv = buildCsvText();
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -3205,6 +3284,7 @@
     URL.revokeObjectURL(url);
     hasUnsavedChanges = false;
     updateUnsavedBadge();
+    rememberCurrentState(false);
   }
 
   // ===== Top 10 rankings =====
@@ -3473,6 +3553,16 @@
   if (viewMode === 'gallery') setViewMode('gallery');
 
   document.getElementById('clearExclusions').addEventListener('click', clearAllExclusions);
+
+  // Laatst gebruikte CSV: vergeten-knop en automatisch openen
+  document.getElementById('rememberedForget').addEventListener('click', forgetCsv);
+  (function restoreLastCsv() {
+    const r = readRemembered();
+    if (!r) return;
+    dbg('Onthouden CSV gevonden: ' + r.name + ' (' + r.text.length + ' tekens)');
+    rememberedName = r.name;
+    setTimeout(() => loadCsvText(r.text, r.name, { restored: true, unsaved: r.unsaved }), 0);
+  })();
 
   // Periode-filter (vanuit de grafiek)
   document.getElementById('periodFilterKind').addEventListener('change', e => {
