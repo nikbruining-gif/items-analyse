@@ -900,6 +900,7 @@
   }
   .export-btn:hover { background: #4A7024; }
   .export-btn:disabled { background: #C9BFA8; cursor: not-allowed; }
+  .cleaned-note { font-size: 12px; color: #7A6B5D; }
   .unsaved-badge {
     background: #D88B6C;
     color: white;
@@ -1397,6 +1398,7 @@
       <button class="top-toggle" id="trendToggle">📈 Verloop tonen</button>
       <button class="export-btn" id="exportBtn">💾 Download aangepaste CSV</button>
       <span class="unsaved-badge hidden" id="unsavedBadge">Niet-opgeslagen wijzigingen</span>
+      <span class="cleaned-note hidden" id="cleanedNote"></span>
     </div>
 
     <div class="trend-panel hidden" id="trendPanel">
@@ -1653,7 +1655,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-09-spaties-merk';
+  const APP_VERSION = '2026-11-09-schone-export';
 
   let allRows = [];
   let filteredRows = [];
@@ -1665,6 +1667,7 @@
   let colMap = {};          // canonical -> original CSV field name
   let originalFileName = 'items-aangepast.csv';
   let hasUnsavedChanges = false;
+  let cleanedCount = 0;              // aantal waarden opgeschoond bij het inlezen (spaties/hoofdletters)
   let editingRowId = null;
   let updateCheckInFlight = false;
   let periodModeSpending = 'month';  // 'month' or 'year'
@@ -2269,7 +2272,18 @@
     // Zelfde merk/staat/platform met andere hoofdletters ("pelikan" en "Pelikan") samenvoegen
     ['merk', 'staat', 'inkoopPlatform', 'verkoopPlatform'].forEach(unifySpelling);
 
-    hasUnsavedChanges = false;
+    // Opgeschoonde waarden ook in de export-gegevens zetten, zodat de 💾-download een schone CSV is
+    cleanedCount = 0;
+    allRows.forEach(r => {
+      ['naam', 'merk', 'staat', 'inkoopPlatform', 'verkoopPlatform'].forEach(f => {
+        const col = colMap[f];
+        if (!col) return;
+        const orig = rawData[r._idx][col] == null ? '' : String(rawData[r._idx][col]);
+        if (orig !== r[f]) { r._raw[col] = r[f]; cleanedCount++; }
+      });
+    });
+
+    hasUnsavedChanges = cleanedCount > 0;
     updateUnsavedBadge();
 
     excludedIds.clear();
@@ -3285,6 +3299,12 @@
     const badge = document.getElementById('unsavedBadge');
     if (hasUnsavedChanges) badge.classList.remove('hidden');
     else badge.classList.add('hidden');
+    const note = document.getElementById('cleanedNote');
+    if (note) {
+      note.classList.toggle('hidden', !(hasUnsavedChanges && cleanedCount > 0));
+      note.textContent = '🧹 ' + cleanedCount + ' waarde' + (cleanedCount === 1 ? '' : 'n') +
+        ' opgeschoond (spaties/hoofdletters). Download de CSV om dit ook in je bestand op te slaan.';
+    }
   }
 
   function buildCsvText() {
@@ -3311,6 +3331,7 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     hasUnsavedChanges = false;
+    cleanedCount = 0;
     updateUnsavedBadge();
     rememberCurrentState(false);
   }
