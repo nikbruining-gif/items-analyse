@@ -982,6 +982,14 @@
     border: 1px solid #D9CFB9;
   }
   .foto-btn-clear:hover { background: #FDF6E3; border-color: #8B3A1F; }
+  .foto-btn-gh { color: #5C5D2A; }
+  .foto-btn-gh:hover { border-color: #5C5D2A; }
+  .gh-mode { font-weight: 600; }
+  .gh-mode.on { color: #5C8A2E; }
+  .gh-intro { font-size: 12.5px; margin: -8px 0 16px 0; }
+  .gh-actions { align-items: center; }
+  .gh-spacer { flex: 1; }
+  #ghModal { z-index: 1100; }
   .lightbox-overlay {
     position: fixed;
     inset: 0;
@@ -1636,13 +1644,54 @@
         <input type="file" id="editFotoFile" accept="image/*" style="display:none;">
         <button type="button" class="foto-btn" id="editFotoPick">📸 Kies foto van apparaat</button>
         <button type="button" class="foto-btn foto-btn-clear" id="editFotoClear">🗑️ Verwijderen</button>
+        <button type="button" class="foto-btn foto-btn-clear foto-btn-gh" id="editGhSettings">⚙️ GitHub-upload</button>
       </div>
       <p class="foto-hint" id="editFotoStatus" style="display:none;"></p>
-      <p class="foto-hint">📁 Bestandsnamen verwijzen naar je <code>images/</code> map in je GitHub repo. Plak alternatief een volledige <code>https://…</code> URL. <br>📸 Bij "Kies foto" wordt de afbeelding gecomprimeerd naar max 1200px, gedownload naar je apparaat, en de bestandsnaam ingevuld — je hoeft 'm alleen nog naar je GitHub <code>images/</code> map te uploaden.</p>
+      <p class="foto-hint gh-mode" id="editGhMode"></p>
+      <p class="foto-hint">📁 Bestandsnamen verwijzen naar je <code>images/</code> map in je GitHub repo. Plak alternatief een volledige <code>https://…</code> URL. <br>📸 Bij "Kies foto" wordt de afbeelding gecomprimeerd naar max 1200px. Met GitHub-upload aan gaat hij direct naar je <code>images/</code> map; anders wordt hij gedownload en upload je hem zelf.</p>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="editCancel">Annuleren</button>
       <button class="btn-save" id="editSave">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="ghModal">
+  <div class="modal">
+    <h2>☁️ Foto's direct naar GitHub</h2>
+    <p class="foto-hint gh-intro">Met een GitHub-token uploadt de app gekozen foto's meteen naar je <code>images/</code> map. De GitHub Action maakt daarna vanzelf de thumbnail. De token wordt alleen in de browser van dít apparaat bewaard en alleen naar <code>api.github.com</code> gestuurd — nooit in de app of de repo.</p>
+    <div class="form-group form-row">
+      <div>
+        <label for="ghOwner">Eigenaar (account)</label>
+        <input type="text" id="ghOwner" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="ghRepo">Repository</label>
+        <input type="text" id="ghRepo" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+    </div>
+    <div class="form-group form-row">
+      <div>
+        <label for="ghBranch">Branch</label>
+        <input type="text" id="ghBranch" placeholder="automatisch" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="ghFolder">Fotomap in repo</label>
+        <input type="text" id="ghFolder" placeholder="images" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="ghToken">Token</label>
+      <input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <p class="foto-hint">Fine-grained token met alleen deze repo en <b>Contents: Read and write</b>. Laat leeg om de opgeslagen token te houden.</p>
+    </div>
+    <p class="foto-hint" id="ghStatus" style="display:none;"></p>
+    <div class="modal-actions gh-actions">
+      <button type="button" class="foto-btn foto-btn-clear" id="ghForget">🗑️ Token vergeten</button>
+      <span class="gh-spacer"></span>
+      <button type="button" class="btn-cancel" id="ghClose">Sluiten</button>
+      <button type="button" class="btn-save" id="ghSave">Testen en opslaan</button>
     </div>
   </div>
 </div>
@@ -1655,7 +1704,10 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-09-schone-export';
+  const APP_VERSION = '2026-11-18-github-upload';
+  // Foto's die in deze sessie naar GitHub zijn geüpload: bestandsnaam → lokale blob-URL.
+  // Zo zie je ze meteen, ook als GitHub Pages nog niet bijgewerkt is.
+  const localFotoPreviews = new Map();
 
   let allRows = [];
   let filteredRows = [];
@@ -2361,6 +2413,8 @@
     if (/^https?:\/\//i.test(v)) return v;
     // Strip leading "images/" if user already included it
     const clean = v.replace(/^\/?images\//i, '');
+    // Net geüpload naar GitHub? Dan de lokale kopie tonen tot GitHub Pages bijgewerkt is.
+    if (localFotoPreviews.has(clean)) return localFotoPreviews.get(clean);
     return 'images/' + clean;
   }
 
@@ -2368,7 +2422,7 @@
   // (.github/workflows/thumbnails.yml). Volledige URL's (https://...) hebben geen thumbnail.
   function thumbUrl(value) {
     const full = fotoUrl(value);
-    if (!full || /^https?:\/\//i.test(full)) return full;
+    if (!full || !/^images\//.test(full)) return full; // URL of lokale kopie: geen thumbnail
     return full.replace(/^images\//, 'images/thumbs/');
   }
   // Attributen voor een thumbnail-<img>: toont de thumbnail, lightbox opent het origineel
@@ -2460,21 +2514,228 @@
     el.style.color = isError ? '#8B3A1F' : '#5C8A2E';
   }
 
+  // ===== Foto's direct naar GitHub (Contents API) =====
+  // De token staat ALLEEN in localStorage van dit apparaat en gaat alleen naar api.github.com.
+  const GH_KEY = 'itemsGithubUpload';
+  const GH_API = 'https://api.github.com';
+
+  // Standaardwaarden afleiden uit de GitHub Pages-URL (bv. nik.github.io/items/index.html)
+  function ghDefaults() {
+    const d = { owner: '', repo: '', branch: '', folder: 'images' };
+    const host = location.hostname.toLowerCase();
+    const m = host.match(/^([a-z0-9-]+)\.github\.io$/);
+    if (!m) return d;
+    d.owner = m[1];
+    const parts = location.pathname.split('/').filter(Boolean);
+    if (parts.length && /\.html?$/i.test(parts[parts.length - 1])) parts.pop();
+    if (parts.length) {
+      d.repo = parts.shift();
+      if (parts.length) d.folder = parts.join('/') + '/images'; // app staat in een submap
+    } else {
+      d.repo = host; // gebruikerssite: repo heet <naam>.github.io
+    }
+    return d;
+  }
+  function ghLoad() {
+    const d = ghDefaults();
+    try {
+      const v = JSON.parse(localStorage.getItem(GH_KEY) || 'null');
+      if (v && typeof v === 'object') return Object.assign(d, v);
+    } catch (e) {}
+    return d;
+  }
+  function ghSaveCfg(cfg) {
+    try { localStorage.setItem(GH_KEY, JSON.stringify(cfg)); return true; } catch (e) { return false; }
+  }
+  function ghReady(cfg) { return !!(cfg && cfg.token && cfg.owner && cfg.repo); }
+
+  function ghPath(cfg, filename) {
+    const folder = String(cfg.folder || 'images').replace(/^\/+|\/+$/g, '');
+    return (folder ? folder + '/' : '') + filename;
+  }
+  function ghContentsUrl(cfg, path) {
+    return GH_API + '/repos/' + encodeURIComponent(cfg.owner) + '/' + encodeURIComponent(cfg.repo) +
+      '/contents/' + path.split('/').map(encodeURIComponent).join('/');
+  }
+  async function ghFetch(cfg, url, opts) {
+    opts = opts || {};
+    const headers = Object.assign({
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + cfg.token,
+      'X-GitHub-Api-Version': '2022-11-28'
+    }, opts.headers || {});
+    return fetch(url, Object.assign({}, opts, { headers, cache: 'no-store' }));
+  }
+  function ghErrorText(status, body) {
+    const msg = body && body.message ? ' (' + body.message + ')' : '';
+    if (status === 401) return 'Token ongeldig of verlopen' + msg;
+    if (status === 403) return 'Geen toegang: geef de token "Contents: Read and write" op deze repo, of laat hem goedkeuren door de organisatie' + msg;
+    if (status === 404) return 'Repository of branch niet gevonden, of de token heeft geen toegang tot deze repo' + msg;
+    if (status === 409) return 'Conflict met de branch, probeer het opnieuw' + msg;
+    return 'GitHub-fout ' + status + msg;
+  }
+  async function ghJson(r) { try { return await r.json(); } catch (e) { return null; } }
+
+  // Controleert toegang tot de repo en vult zo nodig de standaard-branch in
+  async function ghTest(cfg) {
+    const r = await ghFetch(cfg, GH_API + '/repos/' + encodeURIComponent(cfg.owner) + '/' + encodeURIComponent(cfg.repo));
+    const body = await ghJson(r);
+    if (!r.ok) throw new Error(ghErrorText(r.status, body));
+    if (!cfg.branch) cfg.branch = body.default_branch || 'main';
+    return body;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(fr.error || new Error('Kon foto niet lezen'));
+      fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  // Zoekt een vrije bestandsnaam (naam.jpg, naam-2.jpg, ...) zodat een bestaande foto nooit wordt overschreven
+  async function ghFreeName(cfg, baseName) {
+    for (let i = 1; i <= 50; i++) {
+      const name = baseName + (i === 1 ? '' : '-' + i) + '.jpg';
+      const r = await ghFetch(cfg, ghContentsUrl(cfg, ghPath(cfg, name)) + '?ref=' + encodeURIComponent(cfg.branch));
+      if (r.status === 404) return name;
+      if (!r.ok) throw new Error(ghErrorText(r.status, await ghJson(r)));
+    }
+    throw new Error('Geen vrije bestandsnaam gevonden voor ' + baseName);
+  }
+
+  async function ghUploadFoto(cfg, blob, baseName) {
+    if (!cfg.branch) await ghTest(cfg);
+    const content = await blobToBase64(blob);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const name = await ghFreeName(cfg, baseName);
+      const r = await ghFetch(cfg, ghContentsUrl(cfg, ghPath(cfg, name)), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Foto toegevoegd: ' + name, content, branch: cfg.branch })
+      });
+      if (r.ok) return name;
+      const body = await ghJson(r);
+      if (r.status === 422 || r.status === 409) continue; // net bezet geraakt: volgende naam
+      throw new Error(ghErrorText(r.status, body));
+    }
+    throw new Error('Uploaden mislukt na meerdere pogingen');
+  }
+
+  function updateGhModeHint() {
+    const el = document.getElementById('editGhMode');
+    if (!el) return;
+    const cfg = ghLoad();
+    if (ghReady(cfg)) {
+      el.textContent = '☁️ GitHub-upload staat aan: foto\'s gaan direct naar ' + cfg.owner + '/' + cfg.repo + '/' + ghPath(cfg, '');
+      el.classList.add('on');
+    } else {
+      el.textContent = '⬇️ GitHub-upload staat uit: gekozen foto\'s worden gedownload.';
+      el.classList.remove('on');
+    }
+  }
+
+  function setGhStatus(msg, isError) {
+    const el = document.getElementById('ghStatus');
+    if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = 'block';
+    el.textContent = msg;
+    el.style.color = isError ? '#8B3A1F' : '#5C8A2E';
+  }
+  function openGhSettings() {
+    const cfg = ghLoad();
+    document.getElementById('ghOwner').value = cfg.owner || '';
+    document.getElementById('ghRepo').value = cfg.repo || '';
+    document.getElementById('ghBranch').value = cfg.branch || '';
+    document.getElementById('ghFolder').value = cfg.folder || 'images';
+    document.getElementById('ghToken').value = '';
+    document.getElementById('ghToken').placeholder = cfg.token ? '•••••••• opgeslagen' : 'github_pat_…';
+    document.getElementById('ghForget').style.display = cfg.token ? '' : 'none';
+    setGhStatus('');
+    document.getElementById('ghModal').classList.add('active');
+  }
+  function closeGhSettings() {
+    document.getElementById('ghToken').value = '';
+    document.getElementById('ghModal').classList.remove('active');
+    updateGhModeHint();
+  }
+  async function saveGhSettings() {
+    const old = ghLoad();
+    const tokenInput = document.getElementById('ghToken').value.trim();
+    const cfg = {
+      owner: document.getElementById('ghOwner').value.trim(),
+      repo: document.getElementById('ghRepo').value.trim(),
+      branch: document.getElementById('ghBranch').value.trim(),
+      folder: document.getElementById('ghFolder').value.trim().replace(/^\/+|\/+$/g, '') || 'images',
+      token: tokenInput || old.token || ''
+    };
+    if (!cfg.owner || !cfg.repo) { setGhStatus('Vul eigenaar en repository in.', true); return; }
+    if (!cfg.token) { setGhStatus('Plak je token in het veld Token.', true); return; }
+    if (/\s/.test(cfg.token)) { setGhStatus('De token bevat spaties — controleer of je hem goed hebt geplakt.', true); return; }
+    const btn = document.getElementById('ghSave');
+    btn.disabled = true;
+    setGhStatus('⏳ Verbinding testen…', false);
+    try {
+      const repo = await ghTest(cfg);
+      if (!ghSaveCfg(cfg)) throw new Error('Kon de instellingen niet bewaren in deze browser');
+      document.getElementById('ghBranch').value = cfg.branch;
+      document.getElementById('ghToken').value = '';
+      document.getElementById('ghToken').placeholder = '•••••••• opgeslagen';
+      document.getElementById('ghForget').style.display = '';
+      setGhStatus('✅ Verbonden met ' + repo.full_name + ' (branch ' + cfg.branch + '). Foto\'s gaan nu direct naar GitHub.', false);
+      updateGhModeHint();
+    } catch (err) {
+      setGhStatus('Fout: ' + (err && err.message ? err.message : err) + '. Niets opgeslagen.', true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  function forgetGhToken() {
+    const cfg = ghLoad();
+    delete cfg.token;
+    ghSaveCfg(cfg);
+    document.getElementById('ghToken').placeholder = 'github_pat_…';
+    document.getElementById('ghForget').style.display = 'none';
+    setGhStatus('🗑️ Token verwijderd van dit apparaat. Trek hem eventueel ook in op GitHub.', false);
+    updateGhModeHint();
+  }
+
   async function handleFotoFilePicked(file) {
     if (!file) return;
     const naamInput = document.getElementById('editNaam').value.trim();
     const merkInput = document.getElementById('editMerk').value.trim();
     const baseName = slugifyFilename([merkInput, naamInput].filter(Boolean).join(' '));
-    const filename = baseName + '.jpg';
     const pickBtn = document.getElementById('editFotoPick');
+    const cfg = ghLoad();
     pickBtn.disabled = true;
     setFotoStatus('⏳ Foto comprimeren...', false);
     try {
       const { blob, width, height } = await compressImage(file, 1200, 0.85);
+      const kb = Math.round(blob.size / 1024);
+      if (ghReady(cfg)) {
+        setFotoStatus('⏳ Uploaden naar GitHub (' + kb + ' KB)...', false);
+        try {
+          const name = await ghUploadFoto(cfg, blob, baseName);
+          localFotoPreviews.set(name, URL.createObjectURL(blob));
+          document.getElementById('editFoto').value = name;
+          updateFotoPreview();
+          setFotoStatus('✅ ' + name + ' (' + kb + ' KB, ' + width + '×' + height + ') staat op GitHub. Klik op Opslaan; de thumbnail volgt over een paar minuten.', false);
+          return;
+        } catch (err) {
+          // Upload mislukt: terugvallen op downloaden, zodat de foto niet verloren gaat
+          const filename = baseName + '.jpg';
+          downloadBlob(blob, filename);
+          document.getElementById('editFoto').value = filename;
+          updateFotoPreview();
+          setFotoStatus('⚠️ Upload mislukt: ' + (err && err.message ? err.message : err) + '. De foto is gedownload als ' + filename + '; upload hem zelf of controleer ⚙️ GitHub-upload.', true);
+          return;
+        }
+      }
+      const filename = baseName + '.jpg';
       downloadBlob(blob, filename);
       document.getElementById('editFoto').value = filename;
       updateFotoPreview();
-      const kb = Math.round(blob.size / 1024);
       setFotoStatus('✅ ' + filename + ' (' + kb + ' KB, ' + width + '×' + height + ') gedownload. Upload nu naar je images/ map op GitHub.', false);
     } catch (err) {
       setFotoStatus('Fout: ' + (err && err.message ? err.message : err), true);
@@ -3203,6 +3464,7 @@
     document.getElementById('editFoto').value = row.foto || '';
     updateFotoPreview();
     setFotoStatus('');
+    updateGhModeHint();
     document.getElementById('editFotoFile').value = '';
     document.getElementById('editModal').classList.add('active');
   }
@@ -3735,6 +3997,13 @@
   document.getElementById('editFotoFile').addEventListener('change', e => {
     if (e.target.files && e.target.files[0]) handleFotoFilePicked(e.target.files[0]);
   });
+  document.getElementById('editGhSettings').addEventListener('click', openGhSettings);
+  document.getElementById('ghClose').addEventListener('click', closeGhSettings);
+  document.getElementById('ghSave').addEventListener('click', saveGhSettings);
+  document.getElementById('ghForget').addEventListener('click', forgetGhToken);
+  document.getElementById('ghModal').addEventListener('click', e => {
+    if (e.target.id === 'ghModal') closeGhSettings();
+  });
   document.getElementById('editFotoClear').addEventListener('click', () => {
     document.getElementById('editFoto').value = '';
     updateFotoPreview();
@@ -3743,6 +4012,7 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (document.getElementById('lightbox').classList.contains('active')) { closeLightbox(); return; }
+      if (document.getElementById('ghModal').classList.contains('active')) { closeGhSettings(); return; }
       if (document.getElementById('editModal').classList.contains('active')) closeEdit();
     }
   });
