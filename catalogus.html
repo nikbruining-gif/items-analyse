@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Puzzelcollectie</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0; background: #F3EDE0; color: #3D2F1F;
+  }
+  header {
+    background: linear-gradient(135deg, #5C5D2A 0%, #8B3A1F 100%);
+    color: white; padding: 28px 32px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 26px; }
+  header p { margin: 6px 0 0; opacity: 0.9; font-size: 15px; }
+  .container { max-width: 1500px; margin: 0 auto; padding: 24px 32px 110px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: white; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 20px; position: sticky; top: 0; z-index: 5;
+  }
+  .controls input[type=search], .controls select {
+    border: 1px solid #E5DCC8; background: white; color: #3D2F1F; border-radius: 8px;
+    padding: 10px 12px; font-size: 15px; font-family: inherit;
+  }
+  .controls input[type=search] { flex: 1 1 220px; min-width: 0; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid #E5DCC8; background: #FBF8F1;
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  .chip input { margin: 0; width: 16px; height: 16px; }
+  .count { color: #7A6B5D; font-size: 14px; margin-left: auto; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
+  .card {
+    background: white; border: 1px solid #E5DCC8; border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; position: relative;
+  }
+  .card.picked { border-color: #8B3A1F; box-shadow: 0 0 0 2px #8B3A1F inset; }
+  .photo {
+    aspect-ratio: 1 / 1; background: #F3EDE0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+  .photo .empty { font-size: 42px; color: #C9BFA8; }
+  .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .name { font-weight: 700; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+  .brand { color: #7A6B5D; font-size: 13px; }
+  .box { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px;
+    background: rgba(255,255,255,0.92); color: #5C5D2A; box-shadow: 0 1px 3px rgba(0,0,0,0.12); pointer-events: none; }
+  .pick {
+    position: absolute; top: 8px; right: 8px; width: 38px; height: 38px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.92); box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: pointer; font-size: 18px;
+    display: flex; align-items: center; justify-content: center; color: #8B3A1F;
+  }
+  .card.picked .pick { background: #8B3A1F; color: white; }
+  .message { text-align: center; color: #7A6B5D; padding: 50px 20px; }
+  .pickbar {
+    position: fixed; left: 0; right: 0; bottom: 0; background: #3D2F1F; color: white; padding: 12px 20px;
+    display: none; align-items: center; gap: 10px; flex-wrap: wrap; z-index: 10; box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+  }
+  .pickbar.show { display: flex; }
+  .pickbar .spacer { flex: 1; }
+  .pickbar button { border: none; border-radius: 8px; padding: 10px 14px; font-weight: 600; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .pickbar .primary { background: #D88B6C; color: #3D2F1F; }
+  .pickbar .ghost { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.4); }
+  .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 20; }
+  .lightbox.active { display: flex; }
+  .lightbox img { max-width: 94vw; max-height: 88vh; border-radius: 8px; }
+  .lightbox .cap { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: white; font-size: 15px; padding: 0 20px; }
+  .lightbox button { position: absolute; top: 16px; right: 16px; width: 44px; height: 44px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.2); color: white; font-size: 22px; cursor: pointer; }
+  @media (max-width: 640px) {
+    header { padding: 20px 18px; }
+    header h1 { font-size: 22px; }
+    .container { padding: 14px 12px 110px; }
+    .controls { padding: 10px; gap: 8px; }
+    .controls select { flex: 1 1 140px; }
+    .count { margin-left: 0; width: 100%; }
+    .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .body { padding: 9px 10px 11px; }
+    .name { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧩 Puzzelcollectie</h1>
+  <p>Tik op ♡ om puzzels te kiezen en kopieer daarna je lijst. Tik op een foto om hem groot te zien.</p>
+</header>
+<div class="container">
+  <div class="controls">
+    <input type="search" id="q" placeholder="Zoek op naam of merk…" autocomplete="off">
+    <select id="brand"><option value="">Alle merken</option></select>
+    <label class="chip"><input type="checkbox" id="boxOnly"> Met doos</label>
+    <label class="chip"><input type="checkbox" id="pickedOnly"> Mijn keuze</label>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="message" id="msg">Laden…</div>
+</div>
+
+<div class="pickbar" id="pickbar">
+  <span id="pickCount"></span>
+  <span class="spacer"></span>
+  <button type="button" class="ghost" id="pickClear">Wissen</button>
+  <button type="button" class="primary" id="pickCopy">📋 Kopieer mijn lijst</button>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button type="button" id="lbClose" aria-label="Sluiten">✕</button>
+  <img id="lbImg" alt="">
+  <div class="cap" id="lbCap"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var PICK_KEY = 'catalogusKeuze';
+  var items = [];
+  var picked = new Set();
+  try { picked = new Set(JSON.parse(localStorage.getItem(PICK_KEY) || '[]')); } catch (e) {}
+  function savePicked() { try { localStorage.setItem(PICK_KEY, JSON.stringify(Array.from(picked))); } catch (e) {} }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // Eenvoudige CSV-lezer (scheidingsteken ; of ,) met aanhalingstekens
+  function parseCsv(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    var first = text.split(/\r?\n/)[0] || '';
+    var delim = (first.split(';').length >= first.split(',').length) ? ';' : ',';
+    var rows = [], row = [], cur = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+        else cur += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === delim) { row.push(cur); cur = ''; }
+      else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (ch !== '\r') cur += ch;
+    }
+    if (cur.length || row.length) { row.push(cur); rows.push(row); }
+    rows = rows.filter(function (r) { return r.some(function (c) { return c && c.trim(); }); });
+    if (!rows.length) return [];
+    var head = rows[0].map(function (h) { return h.trim().toLowerCase(); });
+    var idx = function (n) { return head.indexOf(n); };
+    var iN = idx('naam'), iM = idx('merk'), iD = idx('doos'), iF = idx('foto');
+    return rows.slice(1).map(function (r) {
+      return {
+        naam: (r[iN] || '').trim(),
+        merk: iM >= 0 ? (r[iM] || '').trim() : '',
+        doos: iD >= 0 && /^(ja|yes|true|1|x)$/i.test((r[iD] || '').trim()),
+        foto: iF >= 0 ? (r[iF] || '').trim() : ''
+      };
+    }).filter(function (it) { return it.naam; });
+  }
+
+  // Foto: volledige https-URL, of bestandsnaam in images/ (thumbnail in images/thumbs/)
+  function fotoUrl(v) {
+    if (!v) return '';
+    if (/^https:\/\//i.test(v)) return v;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(v) || v.indexOf('..') >= 0) return ''; // geen andere protocollen of padtrucs
+    return 'images/' + v.replace(/^\/?images\//i, '').split('/').map(encodeURIComponent).join('/');
+  }
+  function thumbUrl(v) {
+    var f = fotoUrl(v);
+    return /^images\//.test(f) ? f.replace(/^images\//, 'images/thumbs/') : f;
+  }
+  function itemKey(it) { return it.merk + '|' + it.naam; }
+
+  var grid = document.getElementById('grid');
+  var msg = document.getElementById('msg');
+
+  function render() {
+    var q = document.getElementById('q').value.trim().toLowerCase();
+    var brand = document.getElementById('brand').value;
+    var boxOnly = document.getElementById('boxOnly').checked;
+    var pickedOnly = document.getElementById('pickedOnly').checked;
+    var list = items.filter(function (it) {
+      if (brand && it.merk !== brand) return false;
+      if (boxOnly && !it.doos) return false;
+      if (pickedOnly && !picked.has(itemKey(it))) return false;
+      if (q && (it.naam + ' ' + it.merk).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    document.getElementById('count').textContent = list.length + ' van ' + items.length + ' puzzels';
+    grid.innerHTML = list.map(function (it) {
+      var k = itemKey(it), on = picked.has(k), t = thumbUrl(it.foto), f = fotoUrl(it.foto);
+      var photo = t
+        ? '<img loading="lazy" decoding="async" alt="' + esc(it.naam) + '" src="' + esc(t) + '" data-full="' + esc(f) + '">'
+        : '<span class="empty">📷</span>';
+      return '<div class="card' + (on ? ' picked' : '') + '" data-key="' + esc(k) + '">' +
+        '<div class="photo">' + photo + '</div>' +
+        (it.doos ? '<span class="box">Met doos</span>' : '') +
+        '<button type="button" class="pick" aria-label="Kiezen">' + (on ? '♥' : '♡') + '</button>' +
+        '<div class="body"><div class="name">' + esc(it.naam) + '</div><div class="brand">' + esc(it.merk) + '</div></div></div>';
+    }).join('');
+    msg.style.display = list.length ? 'none' : 'block';
+    if (!list.length) msg.textContent = items.length ? 'Geen puzzels gevonden met deze filters.' : 'Er staan nog geen puzzels in de catalogus.';
+    updatePickbar();
+  }
+
+  // Thumbnail ontbreekt → origineel; ook dat niet → 📷
+  grid.addEventListener('error', function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== 'IMG') return;
+    if (!img.dataset.tried && img.dataset.full && img.getAttribute('src') !== img.dataset.full) {
+      img.dataset.tried = '1'; img.src = img.dataset.full; return;
+    }
+    var span = document.createElement('span'); span.className = 'empty'; span.textContent = '📷';
+    img.replaceWith(span);
+  }, true);
+
+  grid.addEventListener('click', function (e) {
+    var card = e.target.closest('.card');
+    if (!card) return;
+    if (e.target.closest('.pick')) {
+      var k = card.dataset.key;
+      if (picked.has(k)) picked.delete(k); else picked.add(k);
+      savePicked();
+      if (document.getElementById('pickedOnly').checked) { render(); return; }
+      var on = picked.has(k);
+      card.classList.toggle('picked', on);
+      e.target.closest('.pick').textContent = on ? '♥' : '♡';
+      updatePickbar();
+      return;
+    }
+    var img = e.target.closest('.photo img');
+    if (img) {
+      document.getElementById('lbImg').src = img.dataset.full || img.src;
+      document.getElementById('lbCap').textContent = card.querySelector('.name').textContent + ' · ' + card.querySelector('.brand').textContent;
+      document.getElementById('lightbox').classList.add('active');
+    }
+  });
+
+  function pickedItems() { return items.filter(function (it) { return picked.has(itemKey(it)); }); }
+  function updatePickbar() {
+    var n = pickedItems().length;
+    document.getElementById('pickbar').classList.toggle('show', n > 0);
+    document.getElementById('pickCount').textContent = n + ' gekozen';
+  }
+  document.getElementById('pickClear').addEventListener('click', function () {
+    picked.clear(); savePicked(); render();
+  });
+  document.getElementById('pickCopy').addEventListener('click', function () {
+    var text = 'Mijn keuze uit je puzzelcollectie:\n' + pickedItems().map(function (it) {
+      return '- ' + it.naam + (it.merk ? ' (' + it.merk + ')' : '');
+    }).join('\n');
+    var btn = this;
+    var done = function () { btn.textContent = '✓ Gekopieerd'; setTimeout(function () { btn.textContent = '📋 Kopieer mijn lijst'; }, 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { window.prompt('Kopieer deze lijst:', text); });
+    } else window.prompt('Kopieer deze lijst:', text);
+  });
+
+  function closeLb() { document.getElementById('lightbox').classList.remove('active'); document.getElementById('lbImg').removeAttribute('src'); }
+  document.getElementById('lightbox').addEventListener('click', function (e) { if (e.target.id !== 'lbImg') closeLb(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLb(); });
+
+  ['q', 'brand', 'boxOnly', 'pickedOnly'].forEach(function (id) {
+    document.getElementById(id).addEventListener(id === 'q' ? 'input' : 'change', render);
+  });
+
+  fetch('catalogus.csv?v=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (text) {
+      items = parseCsv(text);
+      var brands = Array.from(new Set(items.map(function (it) { return it.merk; }).filter(Boolean)))
+        .sort(function (a, b) { return a.localeCompare(b, 'nl'); });
+      document.getElementById('brand').innerHTML = '<option value="">Alle merken</option>' +
+        brands.map(function (b) { return '<option value="' + esc(b) + '">' + esc(b) + '</option>'; }).join('');
+      render();
+    })
+    .catch(function () { msg.textContent = 'De catalogus kon niet geladen worden. Probeer het later opnieuw.'; });
+})();
+</script>
+</body>
+</html>

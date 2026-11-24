@@ -1106,6 +1106,34 @@
   .btn-cancel:hover { background: #D9CFB9; }
 
   /* ===== Mobile (≤ 640px) ===== */
+  /* Catalogus voor koper */
+  .cat-btn {
+    background: white; color: #5C5D2A; border: 1px solid #D9CFB9; padding: 12px 18px; border-radius: 8px;
+    font-size: 15px; font-weight: 600; cursor: pointer; height: 44px; line-height: 1.2; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .cat-btn:hover { background: #F5F0DC; }
+  .cat-modal { width: 620px; }
+  .cat-summary { background: #F5F0DC; border-radius: 8px; padding: 12px 14px; font-size: 14px; margin-bottom: 14px; line-height: 1.5; }
+  .cat-summary b { font-size: 16px; }
+  .cat-merged { border: 1px solid #E5DCC8; border-radius: 8px; max-height: 260px; overflow-y: auto; margin-bottom: 14px; }
+  .cat-merged-row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border-bottom: 1px solid #F0E8D6; font-size: 13px; cursor: pointer; }
+  .cat-merged-row:last-child { border-bottom: none; }
+  .cat-merged-row input { margin-top: 2px; width: 18px; height: 18px; flex-shrink: 0; }
+  .cat-merged-row .cm-name { font-weight: 700; }
+  .cat-merged-row .cm-sub { color: #7A6B5D; font-size: 12px; overflow-wrap: anywhere; }
+  .cat-section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #7A6B5D; letter-spacing: 0.4px; margin: 4px 0 8px; }
+  .cat-link { display: flex; gap: 8px; margin-bottom: 6px; }
+  .cat-link input { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid #D9CFB9; border-radius: 6px; font-size: 13px; font-family: inherit; background: #FBF8F1; }
+  .cat-link button { border: 1px solid #D9CFB9; background: white; border-radius: 6px; padding: 0 12px; cursor: pointer; font-weight: 600; font-family: inherit; color: #5C5D2A; }
+  .cat-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  .cat-actions .export-btn, .cat-actions .cat-btn { height: 40px; font-size: 14px; padding: 8px 14px; }
+  #catStatus { margin-top: 10px; }
+  @media (max-width: 640px) {
+    .cat-actions { flex-direction: column; align-items: stretch; }
+    .cat-actions .export-btn, .cat-actions .cat-btn { justify-content: center; }
+  }
+
   @media (max-width: 640px) {
     header {
       padding: 20px 16px;
@@ -1405,6 +1433,7 @@
       <button class="top-toggle" id="topToggle">🏆 Top 10 lijsten tonen</button>
       <button class="top-toggle" id="trendToggle">📈 Verloop tonen</button>
       <button class="export-btn" id="exportBtn">💾 Download aangepaste CSV</button>
+      <button class="cat-btn" id="catalogBtn" title="Lijst zonder prijzen en datums om met een koper te delen">🔗 Catalogus voor koper</button>
       <span class="unsaved-badge hidden" id="unsavedBadge">Niet-opgeslagen wijzigingen</span>
       <span class="cleaned-note hidden" id="cleanedNote"></span>
     </div>
@@ -1696,6 +1725,31 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="catModal">
+  <div class="modal cat-modal">
+    <h2>🔗 Catalogus voor een koper</h2>
+    <p class="foto-hint" style="margin-top:-10px;">De catalogus bevat <b>alleen naam, merk, doos (ja/nee) en foto</b>. Prijzen, waarde, staat, platforms en datums gaan er niet in — ze worden er al uit gehaald vóórdat het bestand gemaakt wordt.</p>
+    <div class="cat-summary" id="catSummary"></div>
+    <div id="catMergedWrap">
+      <div class="cat-section-title">Samengevoegde dubbele puzzels</div>
+      <p class="foto-hint" style="margin-top:0;">Puzzels met hetzelfde merk en dezelfde naam (op een nummer achteraan na) worden één regel. Klopt een samenvoeging niet — bijvoorbeeld omdat het nummer bij de echte naam hoort — vink hem dan uit.</p>
+      <div class="cat-merged" id="catMerged"></div>
+    </div>
+    <div class="cat-section-title">Link voor de koper</div>
+    <div class="cat-link">
+      <input type="text" id="catLink" readonly>
+      <button type="button" id="catCopy">Kopieer</button>
+    </div>
+    <p class="foto-hint" id="catLinkHint">De koper ziet alleen <code>catalogus.html</code> met de gegevens uit <code>catalogus.csv</code>. Zet je volledige CSV nooit in de repo.</p>
+    <p class="foto-hint" id="catStatus" style="display:none;"></p>
+    <div class="cat-actions">
+      <button type="button" class="btn-cancel" id="catClose">Sluiten</button>
+      <button type="button" class="cat-btn" id="catDownload">⬇️ Download catalogus.csv</button>
+      <button type="button" class="export-btn" id="catUpload">☁️ Zet catalogus op GitHub</button>
+    </div>
+  </div>
+</div>
+
 <div class="lightbox-overlay" id="lightbox">
   <button class="lightbox-close" id="lightboxClose" aria-label="Sluiten">✕</button>
   <img id="lightboxImg" alt="">
@@ -1704,7 +1758,7 @@
 <script>
   // App-versie. Wordt door checkForUpdate() vergeleken met de versie van de live pagina
   // op GitHub Pages — bij verschil verschijnt er een 'Nieuwe versie'-banner.
-  const APP_VERSION = '2026-11-18-github-upload';
+  const APP_VERSION = '2026-11-24-catalogus';
   // Foto's die in deze sessie naar GitHub zijn geüpload: bestandsnaam → lokale blob-URL.
   // Zo zie je ze meteen, ook als GitHub Pages nog niet bijgewerkt is.
   const localFotoPreviews = new Map();
@@ -2659,6 +2713,7 @@
     document.getElementById('ghToken').value = '';
     document.getElementById('ghModal').classList.remove('active');
     updateGhModeHint();
+    if (document.getElementById('catModal').classList.contains('active')) renderCatalogModal();
   }
   async function saveGhSettings() {
     const old = ghLoad();
@@ -3598,6 +3653,175 @@
     rememberCurrentState(false);
   }
 
+  // ===== Catalogus voor koper =====
+  // Maakt een aparte CSV met alleen Naam, Merk, Doos en Foto (geen prijzen, staat, platforms of datums).
+  // Alleen niet-verkochte items; bundel-rijen en handmatig uitgesloten items (🚫) gaan er niet in.
+  // Dubbele puzzels ("Naam", "Naam 2", "Naam (3)", "Naam #4") van hetzelfde merk worden één regel.
+  const CAT_NOMERGE_KEY = 'catalogNoMerge';
+  let catNoMerge = new Set();
+  try { catNoMerge = new Set(JSON.parse(localStorage.getItem(CAT_NOMERGE_KEY) || '[]')); } catch (e) {}
+  function saveCatNoMerge() {
+    try { localStorage.setItem(CAT_NOMERGE_KEY, JSON.stringify([...catNoMerge])); } catch (e) {}
+  }
+  function catBaseName(naam) {
+    const n = normText(naam);
+    const base = n.replace(/\s*(?:\(\s*\d+\s*\)|#\s*\d+|-\s*\d+|\d+)\s*$/, '').trim();
+    return base || n;
+  }
+  function catKey(merk, base) { return (merk || '').toLowerCase() + '|' + base.toLowerCase(); }
+
+  function buildCatalog() {
+    const pool = [...allRows]
+      .sort((a, b) => a._idx - b._idx)
+      .filter(r => r.naam && !r.verkocht && !r._isBundleHeader && !excludedIds.has(rowId(r)));
+    const skipped = {
+      verkocht: allRows.filter(r => r.verkocht && !r._isBundleHeader).length,
+      bundel: allRows.filter(r => r._isBundleHeader).length,
+      uitgesloten: allRows.filter(r => !r.verkocht && !r._isBundleHeader && excludedIds.has(rowId(r))).length
+    };
+    const groups = new Map();
+    pool.forEach(r => {
+      const base = catBaseName(r.naam);
+      const key = catKey(r.merk, base);
+      if (!groups.has(key)) groups.set(key, { key, base, merk: r.merk, items: [] });
+      groups.get(key).items.push(r);
+    });
+    const entries = [];
+    const merged = [];
+    groups.forEach(g => {
+      // Eén item: originele naam houden (bv. "Small Box 2" blijft "Small Box 2")
+      if (g.items.length === 1 || catNoMerge.has(g.key)) {
+        g.items.forEach(r => entries.push({ naam: r.naam, merk: r.merk, doos: r.doos, foto: r.foto }));
+      } else {
+        const withFoto = g.items.find(r => r.foto) || g.items[0];
+        entries.push({ naam: g.base, merk: g.merk, doos: g.items.some(r => r.doos), foto: withFoto.foto });
+      }
+      if (g.items.length > 1) merged.push(g);
+    });
+    entries.sort((a, b) => (a.merk || '').localeCompare(b.merk || '', 'nl') || a.naam.localeCompare(b.naam, 'nl'));
+    return { entries, merged, pool, skipped };
+  }
+
+  function buildCatalogCsv(entries) {
+    const rows = entries.map(e => ({ Naam: e.naam, Merk: e.merk, Doos: e.doos ? 'Ja' : 'Nee', Foto: e.foto || '' }));
+    if (!rows.length) return 'Naam;Merk;Doos;Foto';
+    return Papa.unparse(rows, { delimiter: ';', quotes: false });
+  }
+
+  // Map van de app in de repo, afgeleid uit de fotomap ("images" → root, "sub/images" → "sub")
+  function catRepoPath(cfg) {
+    const folder = String(cfg.folder || 'images').replace(/^\/+|\/+$/g, '');
+    const dir = /(^|\/)images$/i.test(folder) ? folder.replace(/\/?images$/i, '') : '';
+    return (dir ? dir + '/' : '') + 'catalogus.csv';
+  }
+  function catShareUrl() {
+    const path = location.pathname.replace(/[^\/]*$/, '');
+    if (location.protocol === 'file:') return 'catalogus.html (zet de app op GitHub Pages om een link te krijgen)';
+    return location.origin + path + 'catalogus.html';
+  }
+
+  function setCatStatus(msg, isError) {
+    const el = document.getElementById('catStatus');
+    if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = 'block';
+    el.textContent = msg;
+    el.style.color = isError ? '#8B3A1F' : '#5C8A2E';
+  }
+
+  function renderCatalogModal() {
+    const c = buildCatalog();
+    const nMergedAway = c.pool.length - c.entries.length;
+    const parts = [];
+    if (c.skipped.verkocht) parts.push(c.skipped.verkocht + ' verkocht');
+    if (c.skipped.bundel) parts.push(c.skipped.bundel + ' bundel-regel' + (c.skipped.bundel === 1 ? '' : 's'));
+    if (c.skipped.uitgesloten) parts.push(c.skipped.uitgesloten + ' handmatig uitgesloten');
+    if (nMergedAway) parts.push(nMergedAway + ' dubbel');
+    const zonderFoto = c.entries.filter(e => !e.foto).length;
+    document.getElementById('catSummary').innerHTML =
+      '<b>' + c.entries.length + ' puzzel' + (c.entries.length === 1 ? '' : 's') + '</b> in de catalogus' +
+      (parts.length ? '<br><span style="color:#7A6B5D;">Weggelaten: ' + escapeHtml(parts.join(', ')) + '</span>' : '') +
+      (zonderFoto ? '<br><span style="color:#8B3A1F;">📷 ' + zonderFoto + ' zonder foto</span>' : '');
+
+    const wrap = document.getElementById('catMergedWrap');
+    const list = document.getElementById('catMerged');
+    wrap.style.display = c.merged.length ? '' : 'none';
+    list.innerHTML = c.merged.map(g => {
+      const on = !catNoMerge.has(g.key);
+      return '<label class="cat-merged-row"><input type="checkbox" data-key="' + escapeHtml(g.key) + '"' + (on ? ' checked' : '') + '>' +
+        '<span><span class="cm-name">' + escapeHtml(g.base) + '</span> <span class="cm-sub">· ' + escapeHtml(g.merk || 'geen merk') +
+        ' · ' + g.items.length + '×</span><br><span class="cm-sub">' + g.items.map(r => escapeHtml(r.naam)).join(' · ') + '</span></span></label>';
+    }).join('');
+    list.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) catNoMerge.delete(cb.dataset.key); else catNoMerge.add(cb.dataset.key);
+        saveCatNoMerge();
+        renderCatalogModal();
+      });
+    });
+
+    const cfg = ghLoad();
+    const up = document.getElementById('catUpload');
+    up.textContent = ghReady(cfg) ? '☁️ Zet catalogus op GitHub' : '☁️ GitHub-upload instellen';
+    document.getElementById('catLink').value = catShareUrl();
+    return c;
+  }
+
+  function openCatalog() {
+    if (!allRows.length) return;
+    setCatStatus('');
+    renderCatalogModal();
+    document.getElementById('catModal').classList.add('active');
+  }
+  function closeCatalog() { document.getElementById('catModal').classList.remove('active'); }
+
+  function downloadCatalog() {
+    const csv = buildCatalogCsv(buildCatalog().entries);
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'catalogus.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setCatStatus('⬇️ catalogus.csv gedownload. Zet hem in je repo naast catalogus.html (dezelfde map als index.html).', false);
+  }
+
+  async function uploadCatalog() {
+    const cfg = ghLoad();
+    if (!ghReady(cfg)) { openGhSettings(); return; }
+    const btn = document.getElementById('catUpload');
+    btn.disabled = true;
+    setCatStatus('⏳ Catalogus naar GitHub sturen…', false);
+    try {
+      if (!cfg.branch) await ghTest(cfg);
+      const path = catRepoPath(cfg);
+      const url = ghContentsUrl(cfg, path);
+      let sha;
+      const g = await ghFetch(cfg, url + '?ref=' + encodeURIComponent(cfg.branch));
+      if (g.ok) sha = ((await ghJson(g)) || {}).sha;
+      else if (g.status !== 404) throw new Error(ghErrorText(g.status, await ghJson(g)));
+      const csv = buildCatalogCsv(buildCatalog().entries);
+      const content = await blobToBase64(new Blob(['﻿' + csv], { type: 'text/csv' }));
+      const body = { message: 'Catalogus bijgewerkt', content, branch: cfg.branch };
+      if (sha) body.sha = sha;
+      const r = await ghFetch(cfg, url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(ghErrorText(r.status, await ghJson(r)));
+      setCatStatus('✅ ' + path + ' staat op GitHub. Na ongeveer een minuut ziet de koper de nieuwe lijst.', false);
+    } catch (err) {
+      setCatStatus('Fout: ' + (err && err.message ? err.message : err) + '. Gebruik eventueel "Download catalogus.csv".', true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function copyCatLink() {
+    const inp = document.getElementById('catLink');
+    try { await navigator.clipboard.writeText(inp.value); }
+    catch (e) { inp.select(); try { document.execCommand('copy'); } catch (e2) {} }
+    const b = document.getElementById('catCopy');
+    b.textContent = '✓ Gekopieerd';
+    setTimeout(() => { b.textContent = 'Kopieer'; }, 1500);
+  }
+
   // ===== Top 10 rankings =====
   function rankClass(i) {
     if (i === 0) return 'top-rank gold';
@@ -4013,6 +4237,7 @@
     if (e.key === 'Escape') {
       if (document.getElementById('lightbox').classList.contains('active')) { closeLightbox(); return; }
       if (document.getElementById('ghModal').classList.contains('active')) { closeGhSettings(); return; }
+      if (document.getElementById('catModal').classList.contains('active')) { closeCatalog(); return; }
       if (document.getElementById('editModal').classList.contains('active')) closeEdit();
     }
   });
@@ -4021,6 +4246,14 @@
     if (e.target.id === 'lightbox' || e.target.id === 'lightboxClose') closeLightbox();
   });
   document.getElementById('exportBtn').addEventListener('click', exportCsv);
+  document.getElementById('catalogBtn').addEventListener('click', openCatalog);
+  document.getElementById('catClose').addEventListener('click', closeCatalog);
+  document.getElementById('catDownload').addEventListener('click', downloadCatalog);
+  document.getElementById('catUpload').addEventListener('click', uploadCatalog);
+  document.getElementById('catCopy').addEventListener('click', copyCatLink);
+  document.getElementById('catModal').addEventListener('click', e => {
+    if (e.target.id === 'catModal') closeCatalog();
+  });
 
   // Warn when leaving page with unsaved changes
   window.addEventListener('beforeunload', e => {
