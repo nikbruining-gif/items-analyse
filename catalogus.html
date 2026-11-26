@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Puzzelcollectie</title>
+<title>Puzzle collection</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -15,7 +15,11 @@
     background: linear-gradient(135deg, #5C5D2A 0%, #8B3A1F 100%);
     color: white; padding: 28px 32px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   }
-  header h1 { margin: 0; font-size: 26px; }
+  header { position: relative; }
+  header h1 { margin: 0; font-size: 26px; padding-right: 100px; }
+  .lang { position: absolute; top: 24px; right: 24px; display: flex; border: 1px solid rgba(255,255,255,0.5); border-radius: 8px; overflow: hidden; }
+  .lang button { border: none; background: transparent; color: white; font: inherit; font-size: 13px; font-weight: 700; padding: 6px 10px; cursor: pointer; opacity: 0.75; }
+  .lang button.on { background: rgba(255,255,255,0.25); opacity: 1; }
   header p { margin: 6px 0 0; opacity: 0.9; font-size: 15px; }
   .container { max-width: 1500px; margin: 0 auto; padding: 24px 32px 110px; }
   .controls {
@@ -75,6 +79,7 @@
   @media (max-width: 640px) {
     header { padding: 20px 18px; }
     header h1 { font-size: 22px; }
+    .lang { top: 18px; right: 14px; }
     .container { padding: 14px 12px 110px; }
     .controls { padding: 10px; gap: 8px; }
     .controls select { flex: 1 1 140px; }
@@ -87,30 +92,34 @@
 </head>
 <body>
 <header>
-  <h1>🧩 Puzzelcollectie</h1>
-  <p>Tik op ♡ om puzzels te kiezen en kopieer daarna je lijst. Tik op een foto om hem groot te zien.</p>
+  <div class="lang" role="group" aria-label="Language / Taal">
+    <button type="button" data-lang="nl" lang="nl">NL</button>
+    <button type="button" data-lang="en" lang="en">EN</button>
+  </div>
+  <h1 data-i18n="title">🧩 Puzzle collection</h1>
+  <p data-i18n="intro">Tap ♡ to pick puzzles, then copy your list. Tap a photo to see it larger.</p>
 </header>
 <div class="container">
   <div class="controls">
-    <input type="search" id="q" placeholder="Zoek op naam of merk…" autocomplete="off">
-    <select id="brand"><option value="">Alle merken</option></select>
-    <label class="chip"><input type="checkbox" id="boxOnly"> Met doos</label>
-    <label class="chip"><input type="checkbox" id="pickedOnly"> Mijn keuze</label>
+    <input type="search" id="q" data-i18n-ph="search" placeholder="Search by name or brand…" autocomplete="off">
+    <select id="brand"><option value="">All brands</option></select>
+    <label class="chip"><input type="checkbox" id="boxOnly"> <span data-i18n="withBox">With box</span></label>
+    <label class="chip"><input type="checkbox" id="pickedOnly"> <span data-i18n="myPicks">My picks</span></label>
     <span class="count" id="count"></span>
   </div>
   <div class="grid" id="grid"></div>
-  <div class="message" id="msg">Laden…</div>
+  <div class="message" id="msg">Loading…</div>
 </div>
 
 <div class="pickbar" id="pickbar">
   <span id="pickCount"></span>
   <span class="spacer"></span>
-  <button type="button" class="ghost" id="pickClear">Wissen</button>
-  <button type="button" class="primary" id="pickCopy">📋 Kopieer mijn lijst</button>
+  <button type="button" class="ghost" id="pickClear" data-i18n="clear">Clear</button>
+  <button type="button" class="primary" id="pickCopy" data-i18n="copy">📋 Copy my list</button>
 </div>
 
 <div class="lightbox" id="lightbox">
-  <button type="button" id="lbClose" aria-label="Sluiten">✕</button>
+  <button type="button" id="lbClose" data-i18n-aria="close" aria-label="Close">✕</button>
   <img id="lbImg" alt="">
   <div class="cap" id="lbCap"></div>
 </div>
@@ -123,6 +132,41 @@
   var picked = new Set();
   try { picked = new Set(JSON.parse(localStorage.getItem(PICK_KEY) || '[]')); } catch (e) {}
   function savePicked() { try { localStorage.setItem(PICK_KEY, JSON.stringify(Array.from(picked))); } catch (e) {} }
+
+  // Taal / language: EN standaard, keuze per browser bewaard; ?lang=nl of ?lang=en in de link gaat voor
+  var LANG_KEY = 'catalogusTaal';
+  var TEXT = {
+    en: {
+      docTitle: 'Puzzle collection', title: '🧩 Puzzle collection',
+      intro: 'Tap ♡ to pick puzzles, then copy your list. Tap a photo to see it larger.',
+      search: 'Search by name or brand…', allBrands: 'All brands', withBox: 'With box', myPicks: 'My picks',
+      clear: 'Clear', copy: '📋 Copy my list', copied: '✓ Copied', close: 'Close', pick: 'Pick',
+      count: function (n, total) { return n + ' of ' + total + ' puzzles'; },
+      picked: function (n) { return n + ' picked'; },
+      loading: 'Loading…', none: 'No puzzles found with these filters.', empty: 'There are no puzzles in the catalogue yet.',
+      error: 'The catalogue could not be loaded. Please try again later.',
+      listHead: 'My picks from your puzzle collection:', copyPrompt: 'Copy this list:'
+    },
+    nl: {
+      docTitle: 'Puzzelcollectie', title: '🧩 Puzzelcollectie',
+      intro: 'Tik op ♡ om puzzels te kiezen en kopieer daarna je lijst. Tik op een foto om hem groot te zien.',
+      search: 'Zoek op naam of merk…', allBrands: 'Alle merken', withBox: 'Met doos', myPicks: 'Mijn keuze',
+      clear: 'Wissen', copy: '📋 Kopieer mijn lijst', copied: '✓ Gekopieerd', close: 'Sluiten', pick: 'Kiezen',
+      count: function (n, total) { return n + ' van ' + total + ' puzzels'; },
+      picked: function (n) { return n + ' gekozen'; },
+      loading: 'Laden…', none: 'Geen puzzels gevonden met deze filters.', empty: 'Er staan nog geen puzzels in de catalogus.',
+      error: 'De catalogus kon niet geladen worden. Probeer het later opnieuw.',
+      listHead: 'Mijn keuze uit je puzzelcollectie:', copyPrompt: 'Kopieer deze lijst:'
+    }
+  };
+  var lang = 'en';
+  try {
+    var urlLang = (new URLSearchParams(location.search).get('lang') || '').toLowerCase();
+    var saved = localStorage.getItem(LANG_KEY);
+    if (TEXT[urlLang]) lang = urlLang; else if (TEXT[saved]) lang = saved;
+  } catch (e) {}
+  function t(key) { return TEXT[lang][key]; }
+  var loadState = 'loading'; // loading | ok | error
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -190,20 +234,20 @@
       if (q && (it.naam + ' ' + it.merk).toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
-    document.getElementById('count').textContent = list.length + ' van ' + items.length + ' puzzels';
+    document.getElementById('count').textContent = t('count')(list.length, items.length);
     grid.innerHTML = list.map(function (it) {
-      var k = itemKey(it), on = picked.has(k), t = thumbUrl(it.foto), f = fotoUrl(it.foto);
-      var photo = t
-        ? '<img loading="lazy" decoding="async" alt="' + esc(it.naam) + '" src="' + esc(t) + '" data-full="' + esc(f) + '">'
+      var k = itemKey(it), on = picked.has(k), th = thumbUrl(it.foto), f = fotoUrl(it.foto);
+      var photo = th
+        ? '<img loading="lazy" decoding="async" alt="' + esc(it.naam) + '" src="' + esc(th) + '" data-full="' + esc(f) + '">'
         : '<span class="empty">📷</span>';
       return '<div class="card' + (on ? ' picked' : '') + '" data-key="' + esc(k) + '">' +
         '<div class="photo">' + photo + '</div>' +
-        (it.doos ? '<span class="box">Met doos</span>' : '') +
-        '<button type="button" class="pick" aria-label="Kiezen">' + (on ? '♥' : '♡') + '</button>' +
+        (it.doos ? '<span class="box">' + esc(t('withBox')) + '</span>' : '') +
+        '<button type="button" class="pick" aria-label="' + esc(t('pick')) + '" aria-pressed="' + on + '">' + (on ? '♥' : '♡') + '</button>' +
         '<div class="body"><div class="name">' + esc(it.naam) + '</div><div class="brand">' + esc(it.merk) + '</div></div></div>';
     }).join('');
     msg.style.display = list.length ? 'none' : 'block';
-    if (!list.length) msg.textContent = items.length ? 'Geen puzzels gevonden met deze filters.' : 'Er staan nog geen puzzels in de catalogus.';
+    if (!list.length) msg.textContent = items.length ? t('none') : t('empty');
     updatePickbar();
   }
 
@@ -229,6 +273,7 @@
       var on = picked.has(k);
       card.classList.toggle('picked', on);
       e.target.closest('.pick').textContent = on ? '♥' : '♡';
+      e.target.closest('.pick').setAttribute('aria-pressed', on);
       updatePickbar();
       return;
     }
@@ -244,21 +289,55 @@
   function updatePickbar() {
     var n = pickedItems().length;
     document.getElementById('pickbar').classList.toggle('show', n > 0);
-    document.getElementById('pickCount').textContent = n + ' gekozen';
+    document.getElementById('pickCount').textContent = t('picked')(n);
   }
   document.getElementById('pickClear').addEventListener('click', function () {
     picked.clear(); savePicked(); render();
   });
   document.getElementById('pickCopy').addEventListener('click', function () {
-    var text = 'Mijn keuze uit je puzzelcollectie:\n' + pickedItems().map(function (it) {
+    var text = t('listHead') + '\n' + pickedItems().map(function (it) {
       return '- ' + it.naam + (it.merk ? ' (' + it.merk + ')' : '');
     }).join('\n');
     var btn = this;
-    var done = function () { btn.textContent = '✓ Gekopieerd'; setTimeout(function () { btn.textContent = '📋 Kopieer mijn lijst'; }, 1600); };
+    var done = function () { btn.textContent = t('copied'); setTimeout(function () { btn.textContent = t('copy'); }, 1600); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { window.prompt('Kopieer deze lijst:', text); });
-    } else window.prompt('Kopieer deze lijst:', text);
+      navigator.clipboard.writeText(text).then(done, function () { window.prompt(t('copyPrompt'), text); });
+    } else window.prompt(t('copyPrompt'), text);
   });
+
+  function fillBrands() {
+    var sel = document.getElementById('brand'), cur = sel.value;
+    var brands = Array.from(new Set(items.map(function (it) { return it.merk; }).filter(Boolean)))
+      .sort(function (a, b) { return a.localeCompare(b, lang); });
+    sel.innerHTML = '<option value="">' + esc(t('allBrands')) + '</option>' +
+      brands.map(function (b) { return '<option value="' + esc(b) + '">' + esc(b) + '</option>'; }).join('');
+    sel.value = brands.indexOf(cur) >= 0 ? cur : '';
+  }
+
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.title = t('docTitle');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-ph]'), function (el) { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-aria]'), function (el) { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
+    Array.prototype.forEach.call(document.querySelectorAll('.lang button'), function (b) {
+      var on = b.getAttribute('data-lang') === lang;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    });
+    fillBrands();
+    if (loadState === 'ok') render();
+    else { msg.style.display = 'block'; msg.textContent = t(loadState); }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.lang button'), function (b) {
+    b.addEventListener('click', function () {
+      var l = b.getAttribute('data-lang');
+      if (!TEXT[l] || l === lang) return;
+      lang = l;
+      try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+      applyLang();
+    });
+  });
+  applyLang();
 
   function closeLb() { document.getElementById('lightbox').classList.remove('active'); document.getElementById('lbImg').removeAttribute('src'); }
   document.getElementById('lightbox').addEventListener('click', function (e) { if (e.target.id !== 'lbImg') closeLb(); });
@@ -272,13 +351,11 @@
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(function (text) {
       items = parseCsv(text);
-      var brands = Array.from(new Set(items.map(function (it) { return it.merk; }).filter(Boolean)))
-        .sort(function (a, b) { return a.localeCompare(b, 'nl'); });
-      document.getElementById('brand').innerHTML = '<option value="">Alle merken</option>' +
-        brands.map(function (b) { return '<option value="' + esc(b) + '">' + esc(b) + '</option>'; }).join('');
+      loadState = 'ok';
+      fillBrands();
       render();
     })
-    .catch(function () { msg.textContent = 'De catalogus kon niet geladen worden. Probeer het later opnieuw.'; });
+    .catch(function () { loadState = 'error'; msg.style.display = 'block'; msg.textContent = t('error'); });
 })();
 </script>
 </body>
